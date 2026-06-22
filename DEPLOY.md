@@ -35,8 +35,37 @@ docker run -d --name finapp -p 8080:8080 \
 ```
 
 ## Platform notes
-- **Fly.io:** `fly launch` (no buildpacks — it'll use the Dockerfile), add a volume (`fly volumes create finapp_data`)
-  mounted at `/data`, set `fly secrets set Jwt__Key=...`. Fly provides TLS on the edge.
+
+### Fly.io (recommended starting point) — uses [`fly.toml`](fly.toml)
+Fly builds the image on its **remote builder**, so you don't need Docker installed locally. TLS is automatic at the edge.
+
+```bash
+# 1. Install the CLI (Windows PowerShell): iwr https://fly.io/install.ps1 -useb | iex
+#    (macOS/Linux: curl -L https://fly.io/install.sh | sh)
+fly auth login                       # opens a browser; sign up / log in (needs a card on file)
+
+# 2. Pick a globally-unique app name and set it in fly.toml (app = "...").
+fly apps create your-unique-finapp-name
+
+# 3. Create the persistent volume for SQLite (same region as fly.toml -> fra).
+fly volumes create finapp_data --region fra --size 1   # 1 GB is plenty
+
+# 4. Set the JWT signing secret (the server refuses to start without a real one).
+fly secrets set Jwt__Key="$(openssl rand -base64 48)"
+#   PowerShell without openssl:
+#   $k=[Convert]::ToBase64String((1..48 | %{Get-Random -Max 256}) -as [byte[]]); fly secrets set Jwt__Key="$k"
+
+# 5. Deploy (builds the Dockerfile remotely, runs migrations on startup).
+fly deploy
+
+fly open                             # open the live app
+fly logs                             # tail logs if anything misbehaves
+```
+Notes: SQLite = **single instance** — don't `fly scale count` above 1. To avoid cold starts, set
+`min_machines_running = 1` in `fly.toml`. Back up by copying the DB off the volume
+(`fly ssh console -C "cat /data/finapp-server.db" > backup.db`) or snapshotting the volume.
+
+- **Other platforms:**
 - **Render:** new Web Service from the repo (Docker env), add a Disk mounted at `/data`, set `Jwt__Key`
   as an env var. TLS is automatic.
 - **Azure Container Apps / App Service (container):** push the image to a registry, set `Jwt__Key` as a

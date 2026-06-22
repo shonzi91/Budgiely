@@ -1,0 +1,27 @@
+# Fly.io deployment config for FinApp (one-origin: API + SignalR + WASM UI in one container).
+# `app` must be globally unique — change it before the first deploy.
+app = "finapp"
+primary_region = "fra"   # Frankfurt — closest Fly region to Bulgaria. Run `fly platform regions` for the full list.
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  # The DB connection string + bind URL are baked into the Dockerfile; secrets (Jwt__Key) are set via `fly secrets`.
+
+# Persistent SQLite lives here. The volume must exist in the same region (see `fly volumes create` below).
+[[mounts]]
+  source = "finapp_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true            # redirect http -> https (Fly terminates TLS at the edge)
+  auto_stop_machines = "stop"   # scale to zero when idle -> near-zero cost for a low-traffic family app
+  auto_start_machines = true    # wake on the next request
+  min_machines_running = 0      # set to 1 to keep it always warm (avoids cold starts; costs a bit more)
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"              # the .NET server is comfortable here; 256mb can be tight
