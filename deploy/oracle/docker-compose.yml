@@ -7,9 +7,15 @@
 #   docker compose up -d --build
 services:
   finapp:
-    build:
-      context: ../..          # repo root, where the Dockerfile lives
-      dockerfile: Dockerfile
+    # Pull the prebuilt image from GHCR (built by .github/workflows/docker-publish.yml).
+    # Small VMs can't build the .NET/WASM image themselves, so we never build here.
+    image: ghcr.io/shonzi91/finapp:latest
+    pull_policy: always
+    # To build locally instead (e.g. on a beefy machine), comment out the two lines
+    # above and uncomment:
+    # build:
+    #   context: ../..
+    #   dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       # The server refuses to start in Production without a real key (>= 32 chars).
