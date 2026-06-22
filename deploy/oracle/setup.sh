@@ -16,7 +16,8 @@ if [ "$mem_kb" -lt 2000000 ] && [ ! -f /swapfile ]; then
   echo "==> Adding 2 GB swap…"
   sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
   sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
-  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+  # 'nofail' is critical: without it, a missing /swapfile hangs the next boot (no SSH).
+  echo '/swapfile none swap sw,nofail 0 0' | sudo tee -a /etc/fstab >/dev/null
 fi
 
 echo "==> Installing Docker + git…"
