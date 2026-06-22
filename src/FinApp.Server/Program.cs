@@ -17,9 +17,16 @@ SQLitePCL.Batteries_V2.Init();
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Database provider: SQLite by default (local dev, tests, MAUI), Postgres in the cloud.
+// To use Postgres set Database__Provider=Postgres and ConnectionStrings__FinApp=<Npgsql conn string>.
+var usePostgres = string.Equals(builder.Configuration["Database:Provider"], "Postgres", StringComparison.OrdinalIgnoreCase);
 var connectionString = builder.Configuration.GetConnectionString("FinApp")
                        ?? $"Data Source={Path.Combine(AppContext.BaseDirectory, "finapp-server.db")}";
-builder.Services.AddDbContext<FinAppDbContext>(o => o.UseSqlite(connectionString));
+builder.Services.AddDbContext<FinAppDbContext>(o =>
+{
+    if (usePostgres) o.UseNpgsql(connectionString);
+    else o.UseSqlite(connectionString);
+});
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
@@ -83,10 +90,14 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Apply migrations on startup so the server DB schema is current.
+// Ensure the server DB schema is current on startup.
+// SQLite uses the EF migrations; Postgres uses EnsureCreated (the migrations are SQLite-specific,
+// and the cloud DB is provisioned fresh) so we build the schema straight from the model.
 using (var scope = app.Services.CreateScope())
 {
-    scope.ServiceProvider.GetRequiredService<FinAppDbContext>().Database.Migrate();
+    var db = scope.ServiceProvider.GetRequiredService<FinAppDbContext>();
+    if (usePostgres) db.Database.EnsureCreated();
+    else db.Database.Migrate();
 }
 
 // Translate ApiException into a JSON problem response; everything else bubbles to the default handler.

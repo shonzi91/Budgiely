@@ -4,6 +4,15 @@ FinApp deploys as a **single one-origin container**: `FinApp.Server` hosts the R
 hub, **and** the Blazor WASM web UI on one origin — so there's no CORS to configure in production.
 (CORS is only wired up for local two-terminal dev.)
 
+> **Recommended free path: Google Cloud Run + Neon Postgres** — managed, auto-HTTPS, scales to zero,
+> no VM/volume to babysit. See **[`deploy/cloudrun/`](deploy/cloudrun/README.md)**.
+
+## Database modes
+The server supports two database providers, chosen at runtime:
+- **SQLite** (default) — local dev, tests, and the MAUI client. Needs a persistent file/volume.
+- **Postgres** — set `Database__Provider=Postgres` + `ConnectionStrings__FinApp=<Npgsql connection
+  string>`. Used for managed cloud hosting (Cloud Run + Neon). Schema is created via `EnsureCreated()`.
+
 ## What's in the image
 - Multi-stage [`Dockerfile`](Dockerfile): the SDK stage installs the `wasm-tools` workload and runs
   `dotnet publish` on `FinApp.Server`. Because the server references `FinApp.App.Web`, the published

@@ -282,11 +282,22 @@ unverified locally — but one-origin hosting was verified by running the server
   (SPA fallback). **Not verified locally:** `docker build` (no Docker here) and a real cloud deploy (needs your host creds).
 - **Run one container locally (on a machine with Docker):**
   `docker build -t finapp . && docker run -p 8080:8080 -e Jwt__Key="$(openssl rand -base64 48)" -v finapp-data:/data finapp`
-- **Platform deploy kits added:** `fly.toml` (Fly.io, scale-to-zero) and `deploy/oracle/` (Oracle Cloud Always Free —
-  Docker Compose + Caddy auto-HTTPS + full VM walkthrough; truly $0). `.gitattributes` forces LF on `.sh`/Dockerfile/
-  Compose/Caddyfile; `.env` is gitignored. **User chose the Oracle free-VM route** — deploy is hands-on on their VM
-  (I can't SSH in / can't use the Oracle console), so they follow `deploy/oracle/README.md` and I debug from pasted output.
-  E2E-encrypted snapshots remain the open prod-hardening item before this holds sensitive data long-term.
+- **Platform deploy kits added:** `fly.toml` (Fly.io, scale-to-zero), `deploy/oracle/` (Oracle Cloud Always Free —
+  Docker Compose + Caddy auto-HTTPS), and `deploy/cloudrun/` (the chosen path — see below). `.gitattributes` forces LF on
+  `.sh`/Dockerfile/Compose/Caddyfile; `.env` is gitignored. CI builds + pushes `ghcr.io/shonzi91/finapp` on push to main
+  (`.github/workflows/docker-publish.yml`) for the VM/registry paths.
+- **CI image-build gotchas (fixed):** Blazor WASM publish in `dotnet/sdk:9.0` needs `python` for the Emscripten relink
+  (install `python3 python-is-python3`), and the relink itself is slow → set `<WasmBuildNative>false</WasmBuildNative>`
+  in `FinApp.App.Web.csproj` to skip it. Also dropped the `type=gha` build cache (caused `DeadlineExceeded`).
+- **Oracle free VM was abandoned:** the Always-Free shape only gave ~500 MB RAM → OOM-killed `dnf`/builds and wedged SSH
+  repeatedly. Root lesson: SQLite needs a persistent disk + always-on process, which forces a fragile tiny free VM.
+- **DB is now provider-switchable (Session 7b):** `FinApp.Server` supports **SQLite** (default; dev/tests/MAUI) and
+  **Postgres** via `Database__Provider=Postgres` + `ConnectionStrings__FinApp=<Npgsql>` (added `Npgsql.EntityFrameworkCore
+  .PostgreSQL` 9.0.4). Postgres uses `Database.EnsureCreated()` (the EF migrations are SQLite-specific; cloud DB is fresh);
+  SQLite still uses `Migrate()`. Model was already provider-agnostic (Money→text, all `DateTimeOffset` are UtcNow). 98 tests
+  still green. **Chosen deploy: Google Cloud Run + free Neon Postgres** (`deploy/cloudrun/README.md`) — managed, auto-HTTPS,
+  scale-to-zero, `gcloud run deploy --source .` builds via Cloud Build (no local Docker). Must run `--max-instances 1`
+  (SignalR has no backplane). **Not yet deployed** — user was about to run the Cloud Run steps.
 
 ## Next sessions roadmap (planned 2026-06-19) — confirm scope/order with the user before starting
 
