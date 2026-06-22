@@ -1,0 +1,53 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthState Auth
+@inject BudgetingState State
+
+<div class="app-shell">
+    <header class="app-bar">
+        <span class="brand">FinApp</span>
+        @if (Auth.IsAuthenticated)
+        {
+            <span class="appbar-user">
+                <span class="user">Hello, @Auth.CurrentUser!.Username</span>
+                <button class="link" @onclick="SignOut">Sign out</button>
+            </span>
+        }
+    </header>
+    <main class="app-body">
+        @if (!_restored)
+        {
+            <p class="loading">Loading…</p>
+        }
+        else if (!Auth.IsAuthenticated)
+        {
+            <AuthPanel />
+        }
+        else
+        {
+            @Body
+        }
+    </main>
+</div>
+
+@code {
+    private bool _restored;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.Changed += OnAuthChanged;
+        try { await Auth.TryRestoreAsync(); }
+        catch { /* server unreachable on startup — fall through to the sign-in screen */ }
+        _restored = true;
+    }
+
+    private void OnAuthChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task SignOut()
+    {
+        await State.ResetAsync();
+        await Auth.SignOutAsync();
+    }
+
+    public void Dispose() => Auth.Changed -= OnAuthChanged;
+}

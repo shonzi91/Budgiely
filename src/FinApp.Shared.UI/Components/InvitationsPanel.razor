@@ -1,0 +1,38 @@
+@inject BudgetingState State
+
+@if (State.PendingInvitationCount > 0)
+{
+    <section class="panel invites">
+        <div class="panel-head"><h2>Invitations</h2></div>
+        <ul class="list">
+            @foreach (var inv in State.PendingInvitations)
+            {
+                <li>
+                    <span><strong>@inv.InvitedByUsername</strong> invited you to <strong>@inv.AccountName</strong></span>
+                    <span class="row-actions">
+                        <button class="primary" @onclick="() => Accept(inv.Id)">Accept</button>
+                        <button class="link" @onclick="() => Decline(inv.Id)">Decline</button>
+                    </span>
+                </li>
+            }
+        </ul>
+        @if (_error is not null)
+        {
+            <div class="alert warn-bg">@_error</div>
+        }
+    </section>
+}
+
+@code {
+    private string? _error;
+
+    private Task Accept(Guid id) => Run(() => State.AcceptInvitation(id));
+    private Task Decline(Guid id) => Run(() => State.DeclineInvitation(id));
+
+    private async Task Run(Func<Task> action)
+    {
+        _error = null;
+        try { await action(); }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+}

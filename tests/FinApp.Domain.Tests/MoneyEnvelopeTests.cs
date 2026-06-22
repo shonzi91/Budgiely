@@ -1,0 +1,266 @@
+using FinApp.Domain.Accounts;
+using FinApp.Domain.Budgeting;
+using FinApp.Domain.Common;
+using FinApp.Domain.Periods;
+using FinApp.Domain.Services;
+using Xunit;
+
+namespace FinApp.Domain.Tests;
+
+public class MoneyEnvelopeTests
+{
+    private const string Eur = "EUR";
+    private static Money M(decimal v) => new(v, Eur);
+
+    private static Period PeriodWith(decimal opening, decimal contributed, out Account account, out Guid fund, out Guid category)
+    {
+        account = new Account("Home", Eur);
+        account.AddDefaultFunds();
+        account.AddCategory("Food");
+        fund = account.FundId("Bank");
+        category = account.Categories[0].Id;
+        var period = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        period.SetInitialBalance(fund, M(opening));
+        if (contributed > 0)
+        {
+            var member = account.AddMember(Guid.NewGuid(), "A");
+            period.Deposit(member.UserId, M(contributed));
+        }
+        return period;
+    }
+
+    [Fact]
+    public void Allocatable_is_contributions_and_carryover_not_opening_funds()
+    {
+        // Opening fund balances are just where money sits; only new deposits and the carried leftover are allocatable.
+        var period = PeriodWith(opening: 1000, contributed: 200, out _, out _, out _);
+        Assert.Equal(M(200), period.Allocatable);
+    }
+
+    [Fact]
+    public void Budgets_plus_savings_cannot_exceed_contributions()
+    {
+        var period = PeriodWith(opening: 0, contributed: 1000, out _, out _, out var category);
+
+        period.SetBudget(category, M(600));
+        period.AllocateToSavings(/* generic bucket */ Guid.NewGuid(), M(400), new DateOnly(2026, 1, 2));
+        Assert.Equal(M(0), period.MaxAdditionalSavings);
+
+        // One more euro of either budget or savings is over the contributions.
+        Assert.Throws<InvalidOperationException>(() => period.SetBudget(category, M(601)));
+        Assert.Throws<InvalidOperationException>(() => period.AllocateToSavings(Guid.NewGuid(), M(1), new DateOnly(2026, 1, 3)));
+    }
+
+    [Fact]
+    public void Opening_funds_do_not_widen_the_savings_ceiling()
+    {
+        // A big opening balance with no contributions leaves nothing to save — savings track allocatable money only.
+        var period = PeriodWith(opening: 500, contributed: 0, out _, out _, out _);
+        Assert.Equal(M(0), period.MaxAdditionalSavings);
+        Assert.Throws<InvalidOperationException>(
+            () => period.AllocateToSavings(Guid.NewGuid(), M(1), new DateOnly(2026, 1, 2)));
+    }
+
+    [Fact]
+    public void Savings_can_be_moved_between_buckets_without_changing_the_total()
+    {
+        var account = new Account("Home", Eur);
+        account.AddDefaultFunds();
+        var vacations = account.AddSavingCategory("Vacations");
+        var car = account.AddSavingCategory("Car");
+        var member = account.AddMember(Guid.NewGuid(), "A");
+        var period = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        period.Deposit(member.UserId, M(1000));
+        period.AllocateToSavings(vacations.Id, M(300), new DateOnly(2026, 1, 2));
+
+        period.TransferSavings(vacations.Id, car.Id, M(120), new DateOnly(2026, 1, 3));
+
+        Assert.Equal(M(300), period.SavingsNetTotal); // total unchanged
+        Assert.Equal(M(180), account.SavingCategoryWithDescendantIds(vacations.Id)
+            .Select(id => period.SavingAllocations.Where(a => a.SavingCategoryId == id).Aggregate(M(0), (s, a) => s + a.Amount))
+            .Aggregate(M(0), (s, m) => s + m));
+        Assert.Throws<ArgumentException>(() => period.TransferSavings(car.Id, car.Id, M(10), new DateOnly(2026, 1, 4)));
+    }
+
+    [Fact]
+    public void Expenses_may_overspend_and_surface_a_deficit()
+    {
+        var period = PeriodWith(opening: 0, contributed: 1000, out _, out var fund, out var category);
+        period.SetBudget(category, M(500));
+        period.AllocateToSavings(Guid.NewGuid(), M(500), new DateOnly(2026, 1, 2));
+
+        // Spend 510 against the 500 budget — allowed, but it eats 10 into the savings earmark.
+        period.AddExpense(new Expense(category, M(510), new DateOnly(2026, 1, 5), Guid.NewGuid(), fund));
+
+        Assert.Equal(M(490), period.ExpectedClosingBalance); // 1000 - 510
+        Assert.Equal(M(10), period.Deficit);                 // 500 saved - 490 cash left
+    }
+
+    [Fact]
+    public void Bucket_initial_amount_counts_toward_balance_but_not_the_savings_rate()
+    {
+        // The reported bug: 3000 contributed + a 10000 pre-existing savings balance must not inflate the rate.
+        var account = new Account("Home", Eur);
+        var bucket = account.AddSavingCategory("Reserve");
+        account.SetSavingInitialAmount(bucket.Id, 10000m);
+        var member = account.AddMember(Guid.NewGuid(), "A");
+        var period = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        period.Deposit(member.UserId, M(3000));
+        period.AllocateToSavings(bucket.Id, M(600), new DateOnly(2026, 1, 5));
+
+        var report = new SavingsReportService();
+        Assert.Equal(M(10600), report.ForBucket(account, period, bucket.Id).AccumulatedTotal); // 10000 + 600
+        Assert.Equal(M(10600), report.AccumulatedTotal(account));
+        Assert.Equal(0.2m, report.PeriodSavingsRate(period));   // 600 / 3000, initial excluded
+        Assert.Equal(0.2m, report.AccountSavingsRate(account)); // 600 / 3000, initial excluded
+    }
+
+    [Fact]
+    public void Carryover_leftover_is_allocatable_but_excluded_from_the_closing_balance()
+    {
+        var account = new Account("Home", Eur);
+        account.AddDefaultFunds();
+        var food = account.AddCategory("Food");
+        var member = account.AddMember(Guid.NewGuid(), "A");
+        var period = account.StartPeriod(new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 28));
+        period.SetInitialBalance(account.FundId("Bank"), M(1150)); // real opening (carried money already sits here)
+        period.SetCarryover(M(650));                                // leftover = opening - prev closing
+        period.Deposit(member.UserId, M(200));                      // new money this period
+
+        Assert.Equal(M(650), period.CarryoverTotal);
+        Assert.Equal(M(850), period.Allocatable);                   // 650 carried leftover + 200 new (opening not added)
+        Assert.Equal(M(200), period.ContributionsPaidTotal);        // new deposits only — carryover lives in CarriedIn
+        Assert.Equal(M(1350), period.ExpectedClosingBalance);       // 1150 opening + 200 new (carryover excluded)
+
+        period.SetBudget(food.Id, M(800));
+        Assert.Equal(M(50), period.MaxAdditionalSavings);          // 850 - 800
+    }
+
+    [Fact]
+    public void Transfer_out_to_another_account_reduces_the_fund_and_closing_balance()
+    {
+        var period = PeriodWith(opening: 1000, contributed: 0, out _, out var fund, out _);
+        var transfer = period.TransferOut(fund, M(300), new DateOnly(2026, 1, 5), Guid.NewGuid(), "to Shared");
+
+        Assert.Equal(M(300), period.ExternalOutTotal);
+        Assert.Equal(M(700), period.FundBalance(fund));            // 1000 - 300 sent out
+        Assert.Equal(M(700), period.ExpectedClosingBalance);       // outflow leaves the account
+
+        period.RemoveExternalTransfer(transfer.Id);
+        Assert.Equal(M(0), period.ExternalOutTotal);
+        Assert.Equal(M(1000), period.ExpectedClosingBalance);
+    }
+
+    [Fact]
+    public void Saving_moved_to_a_budget_is_listed_and_can_be_undone()
+    {
+        var period = PeriodWith(opening: 0, contributed: 1000, out _, out _, out var category);
+        var bucket = Guid.NewGuid();
+        period.AllocateToSavings(bucket, M(500), new DateOnly(2026, 1, 2));
+
+        period.ConvertSavingToBudget(bucket, category, M(200), new DateOnly(2026, 1, 3));
+        var move = Assert.Single(period.SavingMovements());
+        Assert.Equal(M(200), period.FindBudget(category)!.Allocated);
+        Assert.Equal(M(300), period.SavingsNetTotal);              // 500 set aside - 200 matured
+
+        period.RemoveSavingMovement(move.Id);
+        Assert.Empty(period.SavingMovements());
+        Assert.Equal(M(500), period.SavingsNetTotal);              // earmark restored
+        Assert.Equal(M(0), period.FindBudget(category)!.Allocated); // budget bump reversed
+    }
+
+    [Fact]
+    public void Saving_moved_between_buckets_is_listed_once_and_removed_as_a_pair()
+    {
+        var account = new Account("Home", Eur);
+        var vacations = account.AddSavingCategory("Vacations");
+        var car = account.AddSavingCategory("Car");
+        var member = account.AddMember(Guid.NewGuid(), "A");
+        var period = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        period.Deposit(member.UserId, M(1000));
+        period.AllocateToSavings(vacations.Id, M(300), new DateOnly(2026, 1, 2));
+
+        period.TransferSavings(vacations.Id, car.Id, M(120), new DateOnly(2026, 1, 3));
+        var move = Assert.Single(period.SavingMovements());        // only the outgoing half is listed
+        Assert.Equal(2, period.SavingAllocations.Count(a => a.TransferPairId == move.TransferPairId));
+
+        period.RemoveSavingMovement(move.Id);
+        Assert.Empty(period.SavingMovements());
+        Assert.Equal(M(300), period.SavingsNetTotal);              // net unchanged before and after
+        Assert.DoesNotContain(period.SavingAllocations, a => a.TransferPairId is not null);
+    }
+
+    [Fact]
+    public void Carryover_can_be_negative_and_reduces_allocatable()
+    {
+        // A shortfall (opening < previous closing) carries in as a negative leftover that eats into what can be allocated.
+        var account = new Account("Home", Eur);
+        account.AddDefaultFunds();
+        var member = account.AddMember(Guid.NewGuid(), "A");
+        var period = account.StartPeriod(new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 28));
+        period.Deposit(member.UserId, M(300));
+        period.SetCarryover(M(-100));
+
+        Assert.Equal(M(-100), period.CarryoverTotal);     // not clamped
+        Assert.Equal(M(200), period.Allocatable);          // 300 new − 100 shortfall
+    }
+
+    [Fact]
+    public void Deposits_reduce_the_unallocated_shortfall_automatically()
+    {
+        var account = new Account("Home", Eur);
+        var member = account.AddMember(Guid.NewGuid(), "A");
+        var period = account.StartPeriod(new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 28));
+        period.SetCarryover(M(-300)); // shortfall
+
+        Assert.Equal(M(300), period.UnallocatedShortfall);
+        period.Deposit(member.UserId, M(120));             // a real contribution offsets it
+        Assert.Equal(M(180), period.UnallocatedShortfall); // 300 − 120, automatically
+    }
+
+    [Fact]
+    public void A_shortfall_can_be_covered_from_a_savings_bucket_and_lists_as_a_movement()
+    {
+        var account = new Account("Home", Eur);
+        account.AddDefaultFunds();
+        var reserve = account.AddSavingCategory("Reserve");
+        account.SetSavingInitialAmount(reserve.Id, 500m); // pre-existing savings to draw on
+        var period = account.StartPeriod(new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 28));
+        period.SetCarryover(M(-100)); // shortfall, no deposits
+
+        Assert.Equal(M(100), period.UnallocatedShortfall);
+        Assert.Equal(M(-100), period.Allocatable);
+
+        period.CoverCarryoverFromSavings(reserve.Id, M(60), new DateOnly(2026, 2, 5));
+
+        var move = Assert.Single(period.SavingMovements());            // shows up as a spend-savings movement
+        Assert.Equal(Period.CarryoverSource, move.BudgetCategoryId);    // tagged "From previous period"
+        Assert.Equal(M(40), period.UnallocatedShortfall);              // 100 − 60 covered
+        Assert.Equal(M(-40), period.Allocatable);
+        Assert.Equal(M(-60), period.SavingsNetTotal);                  // bucket drawn down by 60
+
+        // Can't cover more than what's left.
+        Assert.Throws<InvalidOperationException>(
+            () => period.CoverCarryoverFromSavings(reserve.Id, M(41), new DateOnly(2026, 2, 6)));
+
+        // Undo restores the shortfall and the bucket.
+        period.RemoveSavingMovement(move.Id);
+        Assert.Empty(period.SavingMovements());
+        Assert.Equal(M(100), period.UnallocatedShortfall);
+        Assert.Equal(M(0), period.SavingsNetTotal);
+    }
+
+    [Fact]
+    public void Editing_a_deposit_overwrites_the_total_and_deleting_clears_it()
+    {
+        var period = PeriodWith(opening: 0, contributed: 100, out var account, out _, out _);
+        var member = account.Members[0].UserId;
+        Assert.Equal(M(100), period.ContributionsPaidTotal);
+
+        period.SetDeposit(member, M(250));
+        Assert.Equal(M(250), period.ContributionsPaidTotal);
+
+        period.RemoveDeposit(member);
+        Assert.Equal(M(0), period.ContributionsPaidTotal);
+    }
+}

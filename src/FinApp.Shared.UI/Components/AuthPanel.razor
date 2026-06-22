@@ -1,0 +1,64 @@
+@inject AuthState Auth
+
+<div class="auth">
+    <h1>FinApp</h1>
+    <p class="hint">Private, shared budgeting. Sign in or create an account to begin.</p>
+
+    <div class="auth-tabs">
+        <button class="tab @(_mode == Mode.Login ? "active" : "")" @onclick="() => Switch(Mode.Login)">Sign in</button>
+        <button class="tab @(_mode == Mode.Register ? "active" : "")" @onclick="() => Switch(Mode.Register)">Create account</button>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="alert warn-bg">@_error</div>
+    }
+
+    @if (_mode == Mode.Login)
+    {
+        <label>Username or email <input @bind="_identifier" @bind:event="oninput" /></label>
+        <label>Password <input type="password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
+        <button class="primary" @onclick="SignIn" disabled="@(_busy || string.IsNullOrWhiteSpace(_identifier) || string.IsNullOrEmpty(_password))">
+            @(_busy ? "Signing in…" : "Sign in")
+        </button>
+    }
+    else
+    {
+        <label>Username <input @bind="_username" @bind:event="oninput" /></label>
+        <label>Email <input @bind="_email" @bind:event="oninput" /></label>
+        <label>Password <input type="password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
+        <button class="primary" @onclick="Register" disabled="@(_busy || !CanRegister)">
+            @(_busy ? "Creating…" : "Create account")
+        </button>
+        <small class="hint">Password must be at least 8 characters.</small>
+    }
+</div>
+
+@code {
+    private enum Mode { Login, Register }
+    private Mode _mode = Mode.Login;
+    private string _identifier = "", _username = "", _email = "", _password = "";
+    private string? _error;
+    private bool _busy;
+
+    private bool CanRegister =>
+        !string.IsNullOrWhiteSpace(_username) && !string.IsNullOrWhiteSpace(_email) && _password.Length >= 8;
+
+    private void Switch(Mode mode) { _mode = mode; _error = null; }
+
+    private Task OnKey(KeyboardEventArgs e) =>
+        e.Key == "Enter" ? (_mode == Mode.Login ? SignIn() : Register()) : Task.CompletedTask;
+
+    private Task SignIn() => Run(() => Auth.LogInAsync(_identifier, _password));
+    private Task Register() => Run(() => Auth.RegisterAsync(_username, _email, _password));
+
+    private async Task Run(Func<Task> action)
+    {
+        if (_busy) return;
+        _error = null;
+        _busy = true;
+        try { await action(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

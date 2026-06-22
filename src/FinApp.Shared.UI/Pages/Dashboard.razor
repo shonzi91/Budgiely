@@ -1,0 +1,1494 @@
+@page "/"
+@implements IDisposable
+@inject BudgetingState State
+
+@if (!State.IsReady)
+{
+    <p class="loading">Loading…</p>
+}
+else if (!State.HasAccounts)
+{
+    <div class="firstrun">
+        <h1>Welcome to FinApp</h1>
+        <InvitationsPanel />
+        <p>Create your first account to get started (e.g. Personal, Shared, Family).</p>
+        @if (_error is not null)
+        {
+            <div class="alert warn-bg">@_error</div>
+        }
+        <div class="firstrun-form">
+            <label>Account name <input type="text" placeholder="Personal" @bind="_fName" /></label>
+            <label>Currency <input type="text" maxlength="3" @bind="_fCurrency" /></label>
+            <button @onclick="CreateFirstAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">Create account</button>
+        </div>
+        <small class="hint">It starts with a few starter categories and the current month’s period — you can change everything.</small>
+    </div>
+}
+else
+{
+<div class="dash">
+    <header class="dash-head">
+        <div class="period-nav">
+            <button class="nav" title="Previous period" @onclick="State.GoPrev" disabled="@(!State.CanGoPrev)">◀</button>
+            <div>
+                <div class="acct-row">
+                    <select class="acct-select" value="@State.CurrentAccountId" @onchange="OnAccountChange">
+                        @foreach (var a in State.Accounts)
+                        {
+                            <option value="@a.Id">@a.Name</option>
+                        }
+                    </select>
+                    @if (State.IsOwnerOfCurrent)
+                    {
+                        <button class="link" title="Rename account" @onclick="OpenEditAccount">✏️</button>
+                    }
+                    <button class="link" title="Add a new account" @onclick="OpenAddAccount">➕</button>
+                    <button class="link" title="Invite a contributor" @onclick="OpenInvite">👥</button>
+                    @if (State.IsOwnerOfCurrent)
+                    {
+                        <button class="link" title="Delete account" @onclick="OpenDeleteAccount">🗑️</button>
+                    }
+                    else
+                    {
+                        <span class="chip" title="You were invited to this account">shared</span>
+                    }
+                </div>
+                <div class="period-row">
+                    <span class="period">@State.Period.From.ToString("dd MMM") – @State.Period.To.ToString("dd MMM yyyy") · period @State.PeriodNumber/@State.PeriodCount</span>
+                    <span class="period-ops">
+                        <button class="exp-edit" title="Edit period dates" @onclick="OpenEditPeriod">📅</button>
+                        @if (State.IsLatestPeriod && State.PeriodCount > 1)
+                        {
+                            <button class="exp-edit" title="Remove this period and reopen the previous one" @onclick="OpenRemovePeriod">🗑️</button>
+                        }
+                        @if (State.IsLatestPeriod)
+                        {
+                            <button class="exp-edit" title="Start next month" @onclick="OpenNextPeriod">⏭️</button>
+                        }
+                    </span>
+                </div>
+            </div>
+            <button class="nav" title="Next period" @onclick="State.GoNext" disabled="@(!State.CanGoNext)">▶</button>
+        </div>
+        <div class="head-right">
+            <span class="status">@State.Period.Status</span>
+            <div class="balances">
+                <span class="bal" title="Sum of the period's opening fund values"><span class="bal-label">Opening</span> <strong>@Fmt(State.OpeningBalance)</strong></span>
+                <span class="bal" title="Money expected to carry into the next period"><span class="bal-label">Closing</span> <strong>@Fmt(State.ClosingBalance)</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <InvitationsPanel />
+
+    @if (_error is not null)
+    {
+        <div class="alert warn-bg"><strong>Couldn’t do that.</strong> <span>@_error</span></div>
+    }
+
+    <nav class="tabs">
+        <button class="tab @(_tab == Tab.Account ? "active" : "")" @onclick="() => _tab = Tab.Account">Account</button>
+        <button class="tab @(_tab == Tab.Budgets ? "active" : "")" @onclick="() => _tab = Tab.Budgets">Budgets</button>
+        <button class="tab @(_tab == Tab.Expenses ? "active" : "")" @onclick="() => _tab = Tab.Expenses">Expenses</button>
+        <button class="tab @(_tab == Tab.Savings ? "active" : "")" @onclick="() => _tab = Tab.Savings">Savings</button>
+    </nav>
+
+    @switch (_tab)
+    {
+        case Tab.Account:
+            <section class="cards">
+                <div class="card"><span class="card-label">Contributed</span><span class="card-value">@Fmt(State.TotalContributed)</span></div>
+                <div class="card"><span class="card-label">Spent</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
+                <div class="card"><span class="card-label">Budgeted</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
+                <div class="card savings">
+                    <span class="card-label">Saved this period</span>
+                    <span class="card-value">@Fmt(State.SavingsThisPeriod)</span>
+                    <span class="card-sub">@PctOrDash(State.PeriodSavingsRate) of contributions</span>
+                </div>
+            </section>
+
+            @if (State.Deficit.Amount > 0)
+            {
+                <div class="alert warn-bg">
+                    <strong>Overspent by @Fmt(State.Deficit).</strong>
+                    <span>Expenses ate into your savings earmark. This will need to be covered next period (from a savings bucket or fresh contributions).</span>
+                </div>
+            }
+
+            <section class="panel">
+                <div class="panel-head">
+                    <h2>Funds</h2>
+                    <span class="head-actions">
+                        @if (State.IsPeriodOpen && State.TransferableAccounts.Any() && State.RootFunds.Any())
+                        {
+                            <button class="link" title="Send money to another account" @onclick="OpenTransferOut">📤</button>
+                        }
+                        <button class="link" title="Add a fund" @onclick="OpenAddFund">➕</button>
+                    </span>
+                </div>
+                <ul class="list">
+                    @foreach (var f in State.RootFunds)
+                    {
+                        <li>
+                            <span class="fund-name">@f.Name</span>
+                            <span class="row-actions">
+                                <span class="amt">@Fmt(State.FundBalance(f.Id))</span>
+                                <button class="exp-edit" title="Add sub-fund" @onclick="() => OpenAddSubFund(f.Id)">➕</button>
+                                <button class="exp-edit" title="Edit fund / opening balance" @onclick="() => OpenEditFund(f.Id)">✏️</button>
+                                <button class="exp-edit" title="Remove fund" @onclick="() => OpenDeleteFund(f.Id)">🗑️</button>
+                            </span>
+                        </li>
+                        @foreach (var sub in State.ChildFundsOf(f.Id))
+                        {
+                            <li class="subfund">
+                                <span class="fund-name">↳ @sub.Name</span>
+                                <span class="row-actions">
+                                    <span class="amt">@Fmt(State.FundOpeningBalance(sub.Id))</span>
+                                    <button class="exp-edit" title="Edit sub-fund" @onclick="() => OpenEditFund(sub.Id)">✏️</button>
+                                    <button class="exp-edit" title="Remove sub-fund" @onclick="() => OpenDeleteFund(sub.Id)">🗑️</button>
+                                </span>
+                            </li>
+                        }
+                        @if (State.SubFundsMismatch(f.Id))
+                        {
+                            <li class="subfund-hint"><span class="hint warn-text">Sub-funds total @Fmt(State.SubFundOpeningTotal(f.Id)) — doesn't match @f.Name's @Fmt(State.FundOpeningBalance(f.Id)).</span></li>
+                        }
+                    }
+                    @if (!State.RootFunds.Any())
+                    {
+                        <li><em>No funds yet — add one.</em></li>
+                    }
+                </ul>
+                @if (State.RootFunds.Count > 1 && State.IsPeriodOpen)
+                {
+                    <div class="form transfer-form">
+                        <select @bind="_transferFromId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                        <span class="arrow">→</span>
+                        <select @bind="_transferToId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                        <input type="number" step="0.01" min="0" placeholder="Amount" @bind="_transferAmount" />
+                        <button title="Transfer between funds" @onclick="Transfer" disabled="@(_transferAmount <= 0 || _transferFromId == _transferToId)">🔁</button>
+                    </div>
+                    <small class="hint">Move money between funds — the period total is unchanged, only where the money sits.</small>
+                }
+                @if (State.FundTransfers.Any())
+                {
+                    <ul class="list transfer-log">
+                        @foreach (var t in State.FundTransfers)
+                        {
+                            <li>
+                                <span>@t.Date.ToString("dd MMM") · @State.FundName(t.FromFundId) → @State.FundName(t.ToFundId)@(string.IsNullOrEmpty(t.Note) ? "" : $" · {t.Note}")</span>
+                                <span class="row-actions">
+                                    <span class="amt">@Fmt(t.Amount)</span>
+                                    @if (State.IsPeriodOpen)
+                                    {
+                                        <button class="exp-edit" title="Edit transfer" @onclick="() => OpenEditTransfer(t.Id)">✏️</button>
+                                        <button class="exp-edit" title="Remove transfer" @onclick="() => OpenDeleteTransfer(t.Id)">🗑️</button>
+                                    }
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+                @if (State.ExternalTransfers.Any())
+                {
+                    <ul class="list transfer-log">
+                        @foreach (var t in State.ExternalTransfers)
+                        {
+                            <li>
+                                <span>@t.Date.ToString("dd MMM") · 📤 @State.FundName(t.FundId) → @State.AccountName(t.ToAccountId ?? Guid.Empty)@(string.IsNullOrEmpty(t.Note) ? "" : $" · {t.Note}")</span>
+                                <span class="row-actions">
+                                    <span class="amt">@Fmt(t.Amount)</span>
+                                    @if (State.IsPeriodOpen)
+                                    {
+                                        <button class="exp-edit" title="Remove this transfer (does not reverse the deposit in the other account)" @onclick="() => OpenDeleteExternalTransfer(t.Id)">🗑️</button>
+                                    }
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="panel">
+                <h2>Contributions</h2>
+                @if (State.CarryoverThisPeriod.Amount != 0)
+                {
+                    <ul class="list">
+                        <li class="contrib">
+                            <span class="contrib-name">From previous period</span>
+                            <span class="contrib-state">
+                                @if (State.CarryoverThisPeriod.Amount < 0)
+                                {
+                                    <span class="warn-text">@Fmt(State.CarryoverThisPeriod) shortfall</span>
+                                }
+                                else
+                                {
+                                    <span>@Fmt(State.CarryoverThisPeriod) carried in (added to the pool)</span>
+                                }
+                            </span>
+                        </li>
+                    </ul>
+                    @if (State.HasUnallocatedShortfall)
+                    {
+                        <p class="hint warn-text">@Fmt(State.UnallocatedShortfall) still unallocated — add deposits (which offset it automatically), or cover it from a savings bucket on the Savings tab.</p>
+                    }
+                }
+                @if (State.HasUnallocatedFunds)
+                {
+                    <p class="hint warn-text">@Fmt(State.Unallocated) is contributed but not yet allocated. Assign it to a budget or savings before recording more deposits.</p>
+                }
+                <ul class="list">
+                    @foreach (var m in State.Members)
+                    {
+                        var c = State.ContributionFor(m.UserId);
+                        <li class="contrib">
+                            <span class="contrib-name">@m.DisplayName</span>
+                            <span class="contrib-state">
+                                @if (c is null || c.Paid.IsZero)
+                                {
+                                    <em>no deposits yet</em>
+                                }
+                                else
+                                {
+                                    <span>@Fmt(c.Paid) deposited</span>
+                                    @if (State.IsPeriodOpen)
+                                    {
+                                        <button class="exp-edit" title="Edit deposit" @onclick="() => OpenEditDeposit(m.UserId)">✏️</button>
+                                        <button class="exp-edit" title="Delete deposit" @onclick="() => OpenDeleteDeposit(m.UserId)">🗑️</button>
+                                    }
+                                }
+                            </span>
+                            <span class="contrib-actions">
+                                <input type="number" step="0.01" min="0" placeholder="amount" @bind:get="GetContribAmount(m.UserId)" @bind:set="v => SetContribAmount(m.UserId, v)" />
+                                <button class="ghost" @onclick="() => RecordDeposit(m.UserId)" disabled="@State.HasUnallocatedFunds" title="@(State.HasUnallocatedFunds ? "Allocate existing funds first" : null)">Deposit</button>
+                            </span>
+                        </li>
+                    }
+                    @if (!State.Members.Any())
+                    {
+                        <li><em>No members in this account yet.</em></li>
+                    }
+                </ul>
+            </section>
+
+            <section class="panel">
+                <h2>Recent expenses</h2>
+                <ul class="list">
+                    @foreach (var e in State.RecentExpenses)
+                    {
+                        <li>
+                            <span>@e.Date.ToString("dd MMM") · @State.CategoryName(e.CategoryId)@(e.IsFromSavings ? " · 💰saving" : "")@(string.IsNullOrEmpty(e.Note) ? "" : $" · {e.Note}")</span>
+                            <span class="row-actions">
+                                <span class="amt">@Fmt(e.Amount)</span>
+                                @if (State.IsPeriodOpen)
+                                {
+                                    <button class="exp-edit" title="Edit expense" @onclick="() => OpenEditExpense(e.Id)">✏️</button>
+                                    <button class="exp-edit" title="Remove expense" @onclick="() => OpenDeleteExpense(e.Id)">🗑️</button>
+                                }
+                            </span>
+                        </li>
+                    }
+                    @if (!State.RecentExpenses.Any())
+                    {
+                        <li><em>No expenses yet.</em></li>
+                    }
+                </ul>
+            </section>
+            break;
+
+        case Tab.Budgets:
+            <section class="panel">
+                <div class="panel-head">
+                    <h2>Budgets</h2>
+                    <span>
+                        <button class="link" title="Add a top-level category" @onclick="() => OpenAdd(null)">➕</button>
+                    </span>
+                </div>
+
+                <div class="tree">
+                    @foreach (var root in State.RootCategories)
+                    {
+                        <BudgetTreeNode Node="root" Depth="0" OnEdit="OpenEdit" OnAddSub="OpenAddSub" OnDelete="OpenDelete" OnAddExpense="OpenAddExpense" OnEditExpense="OpenEditExpense" OnDeleteExpense="OpenDeleteExpense" />
+                    }
+                </div>
+            </section>
+            break;
+
+        case Tab.Expenses:
+            <section class="panel">
+                <h2>Add expense</h2>
+                <div class="form">
+                    <select @bind="_categoryId">
+                        @foreach (var (cat, depth) in State.CategoryOptions)
+                        {
+                            <option value="@cat.Id">@IndentLabel(cat.Name, depth)</option>
+                        }
+                    </select>
+                    <input type="number" step="0.01" min="0" placeholder="Amount" @bind="_amount" />
+                    <input type="date" @bind="_expenseDate" />
+                    <select @bind="_fundId">
+                        @foreach (var f in State.RootFunds)
+                        {
+                            <option value="@f.Id">@f.Name</option>
+                        }
+                    </select>
+                    <input type="text" placeholder="Note (optional)" @bind="_note" />
+                    <button title="Add expense" @onclick="AddExpense" disabled="@(_amount <= 0)">➕</button>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>All expenses</h2>
+                <ul class="list">
+                    @foreach (var e in State.AllExpenses)
+                    {
+                        <li>
+                            <span>@e.Date.ToString("dd MMM yyyy") · @State.CategoryName(e.CategoryId)@(e.IsFromSavings ? " · 💰saving" : "")@(string.IsNullOrEmpty(e.Note) ? "" : $" · {e.Note}")</span>
+                            <span class="row-actions">
+                                <span class="amt">@Fmt(e.Amount)</span>
+                                @if (State.IsPeriodOpen)
+                                {
+                                    <button class="exp-edit" title="Edit expense" @onclick="() => OpenEditExpense(e.Id)">✏️</button>
+                                    <button class="exp-edit" title="Remove expense" @onclick="() => OpenDeleteExpense(e.Id)">🗑️</button>
+                                }
+                            </span>
+                        </li>
+                    }
+                    @if (!State.AllExpenses.Any())
+                    {
+                        <li><em>No expenses yet.</em></li>
+                    }
+                </ul>
+            </section>
+            break;
+
+        case Tab.Savings:
+            <section class="panel">
+                <div class="panel-head">
+                    <h2>Savings buckets</h2>
+                    <button class="link" title="Add a savings bucket" @onclick="OpenAddBucket">➕</button>
+                </div>
+                <p class="hint">
+                    <strong>Total saved: @Fmt(State.SavingsAccumulated)</strong> ·
+                    this period: <strong>@PctOrDash(State.PeriodSavingsRate)</strong> of contributions ·
+                    all periods: <strong>@PctOrDash(State.AccountSavingsRate)</strong>
+                </p>
+                <ul class="bucket-list">
+                    @foreach (var (bucket, total) in State.SavingBuckets)
+                    {
+                        <li class="bucket">
+                            <div class="bucket-head">
+                                <span class="bucket-name">@bucket.Name</span>
+                                <span class="bucket-actions">
+                                    <span class="amt save">@Fmt(total)</span>
+                                    <button class="exp-edit" title="Edit bucket / goal" @onclick="() => OpenEditBucket(bucket.Id)">✏️</button>
+                                    <button class="exp-edit" title="Remove bucket" @onclick="() => OpenDeleteBucket(bucket.Id)">🗑️</button>
+                                </span>
+                            </div>
+                            @if (bucket.HasGoal)
+                            {
+                                var g = State.SavingGoal(bucket.Id);
+                                var pct = g.Percent ?? 0;
+                                var cls = g.GoalReached ? "ok" : g.ThresholdReached ? "warn" : "ok";
+                                <div class="bucket-goal">
+                                    <span class="tree-bar"><span class="tree-fill @cls" style="width:@(Math.Min(pct,100))%"></span></span>
+                                    <span class="bucket-goal-pct">@pct% of @Fmt(g.Goal!.Value)@(g.GoalReached ? " ✓" : "")</span>
+                                </div>
+                            }
+                        </li>
+                    }
+                    @if (!State.SavingBuckets.Any())
+                    {
+                        <li><em>No buckets yet — add one to start saving.</em></li>
+                    }
+                </ul>
+            </section>
+
+            @if (State.SavingBuckets.Any())
+            {
+                <section class="panel">
+                    <h2>Add to savings</h2>
+                    <div class="form savings-form">
+                        <select @bind="_savingBucketId">
+                            @foreach (var (bucket, _) in State.SavingBuckets)
+                            {
+                                <option value="@bucket.Id">@bucket.Name</option>
+                            }
+                        </select>
+                        <input type="number" step="0.01" min="0" placeholder="Amount" @bind="_savingAmount" />
+                        <button title="Add to savings" @onclick="AllocateSaving" disabled="@(_savingAmount <= 0 || _savingAmount > State.MaxAdditionalSavings.Amount)">💰</button>
+                    </div>
+                    <small class="hint">Available to save: <strong>@Fmt(State.MaxAdditionalSavings)</strong> (contributed − budgeted).</small>
+                    @if (State.SavingDepositsThisPeriod.Any())
+                    {
+                        <ul class="list">
+                            @foreach (var d in State.SavingDepositsThisPeriod)
+                            {
+                                <li>
+                                    <span>@d.Date.ToString("dd MMM") · @State.SavingBucketName(d.SavingCategoryId)</span>
+                                    <span class="row-actions">
+                                        <span class="amt save">@Fmt(d.Amount)</span>
+                                        @if (State.IsPeriodOpen)
+                                        {
+                                            <button class="exp-edit" title="Edit deposit" @onclick="() => OpenEditSavingDeposit(d.Id)">✏️</button>
+                                            <button class="exp-edit" title="Remove deposit" @onclick="() => OpenDeleteSavingDeposit(d.Id)">🗑️</button>
+                                        }
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+
+                <section class="panel">
+                    <h2>Spend savings</h2>
+                    <div class="form spend-form">
+                        <select @bind="_spendBucketId">
+                            @foreach (var (bucket, _) in State.SavingBuckets)
+                            {
+                                <option value="@bucket.Id">@bucket.Name</option>
+                            }
+                        </select>
+                        <span class="arrow">→</span>
+                        <select @bind="_spendDestId">
+                            @if (State.HasUnallocatedShortfall)
+                            {
+                                <optgroup label="Shortfall">
+                                    <option value="@BudgetingState.CarryoverCategoryId">From previous period (cover @Fmt(State.UnallocatedShortfall))</option>
+                                </optgroup>
+                            }
+                            <optgroup label="Budgets">
+                                @foreach (var (cat, depth) in State.CategoryOptions)
+                                {
+                                    <option value="@cat.Id">@IndentLabel(cat.Name, depth)</option>
+                                }
+                            </optgroup>
+                            @if (State.SavingBuckets.Count > 1)
+                            {
+                                <optgroup label="Savings buckets">
+                                    @foreach (var (bucket, _) in State.SavingBuckets)
+                                    {
+                                        @if (bucket.Id != _spendBucketId)
+                                        {
+                                            <option value="@bucket.Id">@bucket.Name</option>
+                                        }
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                        <input type="number" step="0.01" min="0" placeholder="Amount" @bind="_spendAmount" />
+                        <button title="Move savings" @onclick="MoveSaving" disabled="@(_spendAmount <= 0 || _spendDestId == Guid.Empty || _spendDestId == _spendBucketId)">➡️</button>
+                    </div>
+                    <small class="hint">Pick a destination: a <strong>budget</strong> matures the saving into this month's plan for that category; another <strong>bucket</strong> shifts it across (totals unchanged). The source bucket drops by the amount either way.</small>
+                    @if (State.SavingMovementsThisPeriod.Any())
+                    {
+                        <ul class="list">
+                            @foreach (var m in State.SavingMovementsThisPeriod)
+                            {
+                                <li>
+                                    <span>@m.Date.ToString("dd MMM") · @State.SavingMovementTarget(m)</span>
+                                    <span class="row-actions">
+                                        <span class="amt save">@Fmt(State.Money(-m.Amount.Amount))</span>
+                                        @if (State.IsPeriodOpen)
+                                        {
+                                            <button class="exp-edit" title="Edit this savings movement" @onclick="() => OpenEditSavingMovement(m.Id)">✏️</button>
+                                            <button class="exp-edit" title="Undo this savings movement" @onclick="() => OpenDeleteSavingMovement(m.Id)">🗑️</button>
+                                        }
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+            break;
+    }
+</div>
+
+@if (_modal != Modal.None)
+{
+    <div class="modal-backdrop" @onclick="CloseModal">
+        <div class="modal" @onclick:stopPropagation="true">
+            @switch (_modal)
+            {
+                case Modal.AddCat:
+                    <h3>Add category @(_addParentId is {} p ? $"under {State.CategoryName(p)}" : "(top level)")</h3>
+                    <label>Name <input type="text" @bind="_fName" /></label>
+                    <label>Budget for this period (optional) <input type="number" step="0.01" min="0" @bind="_fBudget" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveAddCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">Add</button>
+                    </div>
+                    break;
+
+                case Modal.EditCat:
+                    <h3>Edit @State.CategoryName(_modalCatId)</h3>
+                    <label>Name <input type="text" @bind="_fName" /></label>
+                    <label>Budget amount <input type="number" step="0.01" min="0" @bind="_fBudget" /></label>
+                    <label>Alert at % <input type="number" step="1" min="0" max="100" @bind="_fThreshold" /></label>
+                    <label class="check"><input type="checkbox" @bind="_fNotify" /> Notify on every expense</label>
+                    <div class="modal-actions">
+                        @if (State.BudgetFor(_modalCatId) is not null)
+                        {
+                            <button class="ghost danger" @onclick="RemoveBudget">Remove budget</button>
+                        }
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveEditCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">Save</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteCat:
+                    <h3>Delete @State.CategoryName(_modalCatId)?</h3>
+                    @if (State.CategoryRemovalBlocker(_modalCatId) is {} blocker)
+                    {
+                        <p class="hint">Can’t delete — @blocker. Remove those first.</p>
+                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">Close</button></div>
+                    }
+                    else
+                    {
+                        <p class="hint">This removes the category permanently.</p>
+                        <div class="modal-actions">
+                            <button class="ghost" @onclick="CloseModal">Cancel</button>
+                            <button class="danger-btn" @onclick="ConfirmDelete">Delete</button>
+                        </div>
+                    }
+                    break;
+
+                case Modal.AddAccount:
+                    <h3>New account</h3>
+                    <label>Name <input type="text" @bind="_fName" /></label>
+                    <label>Currency <input type="text" maxlength="3" @bind="_fCurrency" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveAddAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">Create</button>
+                    </div>
+                    break;
+
+                case Modal.EditAccount:
+                    <h3>Rename account</h3>
+                    <label>Name <input type="text" @bind="_fName" /></label>
+                    <p class="hint">Currency (@State.Currency) can't be changed once an account exists.</p>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveEditAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">Save</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteAccount:
+                    <h3>Delete @State.Account.Name?</h3>
+                    <p class="hint">This permanently deletes the account and <strong>all its periods, budgets, expenses and savings</strong>. This can't be undone.</p>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteAccount">Delete account</button>
+                    </div>
+                    break;
+
+                case Modal.Invite:
+                    <h3>Invite to @State.Account.Name</h3>
+                    <p class="hint">Enter the username of an existing FinApp user. They'll get a prompt to accept; once they do, they can edit everything except deleting the account.</p>
+                    <label>Username <input type="text" @bind="_inviteUsername" @bind:event="oninput" /></label>
+                    @if (_inviteMessage is not null)
+                    {
+                        <div class="alert">@_inviteMessage</div>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Close</button>
+                        <button @onclick="SendInvite" disabled="@(string.IsNullOrWhiteSpace(_inviteUsername))">Send invite</button>
+                    </div>
+                    break;
+
+                case Modal.AddExpense:
+                    <h3>Add expense — @State.CategoryName(_categoryId)</h3>
+                    <label>Amount <input type="number" step="0.01" min="0" @bind="_amount" /></label>
+                    <label>Date <input type="date" @bind="_expenseDate" /></label>
+                    <label>Fund
+                        <select @bind="_fundId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Note (optional) <input type="text" @bind="_note" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="AddExpenseFromModal" disabled="@(_amount <= 0)">Add</button>
+                    </div>
+                    break;
+
+                case Modal.RemovePeriod:
+                    <h3>Remove this period?</h3>
+                    <p class="hint">This deletes period @State.PeriodNumber (@State.Period.From.ToString("dd MMM") – @State.Period.To.ToString("dd MMM yyyy")) and everything in it, then re-opens the previous period as active. This can't be undone.</p>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="danger-btn" @onclick="ConfirmRemovePeriod">Remove period</button>
+                    </div>
+                    break;
+
+                case Modal.NextPeriod:
+                    <h3>Start next month</h3>
+                    <p class="hint">Enter what each fund really holds now (previous closing balance: <strong>@Fmt(State.Period.ExpectedClosingBalance)</strong>). The leftover carries in as a “From previous period” contribution.</p>
+                    @foreach (var f in State.RootFunds)
+                    {
+                        <label>@f.Name <input type="number" step="0.01" @bind:get="GetRealOpening(f.Id)" @bind:set="v => SetRealOpening(f.Id, v)" /></label>
+                    }
+                    <label class="check"><input type="checkbox" @bind="_copyBudgets" /> Copy this period’s budgets forward</label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="ConfirmNextPeriod">Start next month →</button>
+                    </div>
+                    break;
+
+                case Modal.EditExpense:
+                    <h3>Edit expense</h3>
+                    <label>Category
+                        <select @bind="_categoryId">
+                            @foreach (var (cat, depth) in State.CategoryOptions)
+                            {
+                                <option value="@cat.Id">@IndentLabel(cat.Name, depth)</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Amount <input type="number" step="0.01" min="0" @bind="_amount" /></label>
+                    <label>Date <input type="date" @bind="_expenseDate" /></label>
+                    <label>Fund
+                        <select @bind="_fundId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Note (optional) <input type="text" @bind="_note" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveEditExpense" disabled="@(_amount <= 0)">Save</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteExpense:
+                    <h3>Remove this expense?</h3>
+                    @if (State.FindExpense(_editExpenseId) is { } ex)
+                    {
+                        <p class="hint">@ex.Date.ToString("dd MMM") · @State.CategoryName(ex.CategoryId) · @Fmt(ex.Amount)@(ex.IsFromSavings ? " — the savings drawdown will be restored." : "")</p>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteExpense">Remove</button>
+                    </div>
+                    break;
+
+                case Modal.AddBucket:
+                case Modal.EditBucket:
+                    <h3>@(_modal == Modal.AddBucket ? "New savings bucket" : $"Edit {State.FindSavingBucket(_modalBucketId)?.Name}")</h3>
+                    <label>Name <input type="text" @bind="_fName" /></label>
+                    <label>Goal amount (optional) <input type="number" step="0.01" min="0" @bind="_goalAmount" /></label>
+                    <label>Alert at % <input type="number" step="1" min="0" max="100" @bind="_fThreshold" /></label>
+                    <label class="check"><input type="checkbox" @bind="_fNotify" /> Notify on milestone</label>
+                    @if (State.CanSetInitialSavings)
+                    {
+                        <label>Already saved (starting balance) <input type="number" step="0.01" min="0" @bind="_initialSavings" /></label>
+                        <small class="hint">Money you already had in this bucket before using FinApp. It counts toward the balance and goal, but not toward your savings rate.</small>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveBucket" disabled="@(string.IsNullOrWhiteSpace(_fName))">@(_modal == Modal.AddBucket ? "Add" : "Save")</button>
+                    </div>
+                    break;
+
+                case Modal.EditDeposit:
+                    <h3>Edit deposit — @State.MemberName(_depositMemberId)</h3>
+                    <label>Deposited amount <input type="number" step="0.01" min="0" @bind="_depositAmount" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveEditDeposit" disabled="@(_depositAmount < 0)">Save</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteDeposit:
+                    <h3>Delete deposit?</h3>
+                    <p class="hint">This clears @State.MemberName(_depositMemberId)'s deposit for this period.</p>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteDeposit">Delete</button>
+                    </div>
+                    break;
+
+                case Modal.EditSavingDeposit:
+                    <h3>Edit savings deposit — @State.SavingBucketName(_savingDepositBucketId)</h3>
+                    <label>Amount <input type="number" step="0.01" min="0" @bind="_savingDepositAmount" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveEditSavingDeposit" disabled="@(_savingDepositAmount <= 0)">Save</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteSavingDeposit:
+                    <h3>Remove this savings deposit?</h3>
+                    @if (State.FindSavingDeposit(_savingDepositId) is { } sd)
+                    {
+                        <p class="hint">@sd.Date.ToString("dd MMM") · @State.SavingBucketName(sd.SavingCategoryId) · @Fmt(sd.Amount)</p>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteSavingDeposit">Remove</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteBucket:
+                    <h3>Remove @State.FindSavingBucket(_modalBucketId)?.Name?</h3>
+                    @if (State.SavingBucketRemovalBlocker(_modalBucketId) is {} bucketBlocker)
+                    {
+                        <p class="hint">Can’t remove — @bucketBlocker. Spend or move its savings first.</p>
+                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">Close</button></div>
+                    }
+                    else
+                    {
+                        <p class="hint">This removes the empty bucket permanently.</p>
+                        <div class="modal-actions">
+                            <button class="ghost" @onclick="CloseModal">Cancel</button>
+                            <button class="danger-btn" @onclick="ConfirmDeleteBucket">Remove</button>
+                        </div>
+                    }
+                    break;
+
+                case Modal.AddFund:
+                    <h3>@(_fundParentId is { } pp ? $"New sub-fund under {State.FundName(pp)}" : "New fund")</h3>
+                    <label>Name <input type="text" @bind="_fName" /></label>
+                    @if (_fundParentId is null)
+                    {
+                        <label>Opening balance this period (optional) <input type="number" step="0.01" min="0" @bind="_openingAmount" /></label>
+                    }
+                    else
+                    {
+                        <label>Initial value (informational, optional) <input type="number" step="0.01" min="0" @bind="_openingAmount" /></label>
+                        <small class="hint">Sub-fund values are informational only — they should add up to the parent but never affect totals.</small>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveFund" disabled="@(string.IsNullOrWhiteSpace(_fName))">Add</button>
+                    </div>
+                    break;
+
+                case Modal.EditFund:
+                    <h3>Edit @State.FundName(_modalFundId)</h3>
+                    <label>Name <input type="text" @bind="_fName" /></label>
+                    @if (State.FindFund(_modalFundId)?.IsRoot == true)
+                    {
+                        <label>Opening balance this period <input type="number" step="0.01" min="0" @bind="_openingAmount" /></label>
+                        <p class="hint">Changing the opening balance affects this period's reconciliation with the previous one.</p>
+                    }
+                    else
+                    {
+                        <label>Initial value (informational) <input type="number" step="0.01" min="0" @bind="_openingAmount" /></label>
+                        <small class="hint">Informational only — should add up to the parent fund.</small>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveFund" disabled="@(string.IsNullOrWhiteSpace(_fName))">Save</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteFund:
+                    <h3>Remove @State.FundName(_modalFundId)?</h3>
+                    @if (State.FundRemovalBlocker(_modalFundId) is {} fundBlocker)
+                    {
+                        <p class="hint">Can’t remove — @fundBlocker.</p>
+                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">Close</button></div>
+                    }
+                    else
+                    {
+                        @if (State.FundHasOpeningBalance(_modalFundId))
+                        {
+                            <p class="hint">This fund has an opening balance. Move it to another fund, or remove it as-is (the balance is dropped).</p>
+                            <label>Move balance to
+                                <select @bind="_moveBalanceToId">
+                                    <option value="@Guid.Empty">— don't move —</option>
+                                    @foreach (var f in State.RootFunds.Where(f => f.Id != _modalFundId))
+                                    {
+                                        <option value="@f.Id">@f.Name</option>
+                                    }
+                                </select>
+                            </label>
+                        }
+                        else
+                        {
+                            <p class="hint">This removes the fund permanently.</p>
+                        }
+                        <div class="modal-actions">
+                            <button class="ghost" @onclick="CloseModal">Cancel</button>
+                            <button class="danger-btn" @onclick="ConfirmDeleteFund">Remove</button>
+                        </div>
+                    }
+                    break;
+
+                case Modal.EditTransfer:
+                    <h3>Edit transfer</h3>
+                    <label>From
+                        <select @bind="_editTransferFromId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>To
+                        <select @bind="_editTransferToId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Amount <input type="number" step="0.01" min="0" @bind="_editTransferAmount" /></label>
+                    <label>Note (optional) <input type="text" @bind="_editTransferNote" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveEditTransfer" disabled="@(_editTransferAmount <= 0 || _editTransferFromId == _editTransferToId)">Save</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteTransfer:
+                    <h3>Remove this transfer?</h3>
+                    @if (State.FindFundTransfer(_editTransferId) is { } tr)
+                    {
+                        <p class="hint">@tr.Date.ToString("dd MMM") · @State.FundName(tr.FromFundId) → @State.FundName(tr.ToFundId) · @Fmt(tr.Amount)</p>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteTransfer">Remove</button>
+                    </div>
+                    break;
+
+                case Modal.EditPeriod:
+                    <h3>Edit period dates</h3>
+                    <label>From <input type="date" @bind="_periodFrom" /></label>
+                    <label>To <input type="date" @bind="_periodTo" /></label>
+                    <p class="hint">Later periods shift to stay contiguous, keeping their own lengths.</p>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveEditPeriod" disabled="@(_periodTo < _periodFrom)">Save</button>
+                    </div>
+                    break;
+
+                case Modal.TransferOut:
+                    <h3>Send money to another account</h3>
+                    <label>From fund
+                        <select @bind="_extFromFundId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>To account
+                        <select @bind="_extToAccountId">
+                            @foreach (var a in State.TransferableAccounts)
+                            {
+                                <option value="@a.Id">@a.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>Amount <input type="number" step="0.01" min="0" @bind="_extAmount" /></label>
+                    <label>Note (optional) <input type="text" @bind="_extNote" /></label>
+                    <p class="hint">Leaves this account as an outflow (lowering its closing balance) and arrives in the chosen account as <strong>your</strong> contribution.</p>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="ConfirmTransferOut" disabled="@(_extAmount <= 0 || _extToAccountId == Guid.Empty)">Send</button>
+                    </div>
+                    break;
+
+                case Modal.EditSavingMovement:
+                    <h3>Edit savings movement</h3>
+                    @if (State.FindSavingMovement(_savingMovementId) is { } mv)
+                    {
+                        <p class="hint">@State.SavingMovementTarget(mv)</p>
+                    }
+                    <label>Amount <input type="number" step="0.01" min="0" @bind="_savingMovementAmount" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button @onclick="SaveEditSavingMovement" disabled="@(_savingMovementAmount <= 0)">Save</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteSavingMovement:
+                    <h3>Undo this savings movement?</h3>
+                    @if (State.FindSavingMovement(_savingMovementId) is { } mvd)
+                    {
+                        <p class="hint">@mvd.Date.ToString("dd MMM") · @State.SavingMovementTarget(mvd) · @Fmt(State.Money(-mvd.Amount.Amount)). @(mvd.BudgetCategoryId is not null ? "The funded budget is reduced by this amount." : "Both buckets are restored.")</p>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteSavingMovement">Undo</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteExternalTransfer:
+                    <h3>Remove this outgoing transfer?</h3>
+                    @if (State.FindExternalTransfer(_extTransferId) is { } et)
+                    {
+                        <p class="hint">@et.Date.ToString("dd MMM") · @State.FundName(et.FundId) → @State.AccountName(et.ToAccountId ?? Guid.Empty) · @Fmt(et.Amount)</p>
+                    }
+                    <p class="hint warn-text">This only removes the outflow on this side. It does not reverse the deposit already recorded in the other account.</p>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteExternalTransfer">Remove</button>
+                    </div>
+                    break;
+            }
+        </div>
+    </div>
+}
+}
+
+@code {
+    private enum Modal { None, AddCat, EditCat, DeleteCat, AddAccount, EditAccount, DeleteAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, EditDeposit, DeleteDeposit, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, TransferOut, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
+    private enum Tab { Account, Budgets, Expenses, Savings }
+
+    private Tab _tab = Tab.Account;
+
+    private Guid _categoryId;
+    private decimal _amount;
+    private Guid _fundId;
+    private string? _note;
+    private DateOnly _expenseDate = DateOnly.FromDateTime(DateTime.Today);
+
+    private Guid _transferFromId;
+    private Guid _transferToId;
+    private decimal _transferAmount;
+
+    private Guid _editTransferId;
+    private Guid _editTransferFromId;
+    private Guid _editTransferToId;
+    private decimal _editTransferAmount;
+    private string? _editTransferNote;
+    private Guid _modalFundId;
+    private Guid? _fundParentId;
+    private decimal _openingAmount;
+    private Guid _moveBalanceToId;
+
+    private Guid _depositMemberId;
+    private decimal _depositAmount;
+
+    private Guid _savingDepositId;
+    private Guid _savingDepositBucketId;
+    private decimal _savingDepositAmount;
+
+    private DateOnly _periodFrom;
+    private DateOnly _periodTo;
+
+    private Guid _extFromFundId;
+    private Guid _extToAccountId;
+    private decimal _extAmount;
+    private string? _extNote;
+    private Guid _extTransferId;
+
+    private Guid _savingMovementId;
+    private decimal _savingMovementAmount;
+
+    // Per-member deposit input, keyed by member UserId (each row edits its own amount).
+    private readonly Dictionary<Guid, decimal> _contribAmounts = new();
+
+    private decimal GetContribAmount(Guid id) => _contribAmounts.GetValueOrDefault(id);
+    private void SetContribAmount(Guid id, decimal v) => _contribAmounts[id] = v;
+    private Guid _savingBucketId;
+    private decimal _savingAmount;
+    private bool _copyBudgets = true;
+
+    private Guid _spendBucketId;
+    private Guid _spendDestId;
+    private decimal _spendAmount;
+
+    private Guid _editExpenseId;
+    private Guid _modalBucketId;
+    private decimal _goalAmount;
+    private decimal _initialSavings;
+
+    private string? _inviteUsername;
+    private string? _inviteMessage;
+
+    // Per-fund real opening balances entered on "Start next month".
+    private readonly Dictionary<Guid, decimal> _realOpenings = new();
+    private decimal GetRealOpening(Guid id) => _realOpenings.GetValueOrDefault(id);
+    private void SetRealOpening(Guid id, decimal v) => _realOpenings[id] = v;
+
+    // Modal state
+    private Modal _modal = Modal.None;
+    private Guid _modalCatId;
+    private Guid? _addParentId;
+    private string? _fName;
+    private decimal _fBudget;
+    private decimal _fThreshold = 80;
+    private bool _fNotify;
+    private string? _fCurrency = "EUR";
+
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        State.Changed += OnChanged;
+        await State.InitializeAsync();
+        ResetPickers();
+    }
+
+    private void OnChanged() { ResetPickers(); InvokeAsync(StateHasChanged); }
+
+    private void ResetPickers()
+    {
+        if (!State.IsReady || !State.HasAccounts) return;
+        _categoryId = State.AllCategories.FirstOrDefault()?.Id ?? Guid.Empty;
+        _savingBucketId = State.SavingBuckets.FirstOrDefault().Bucket?.Id ?? Guid.Empty;
+        _spendBucketId = _savingBucketId;
+        _spendDestId = _categoryId;
+        _fundId = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
+        _transferFromId = _fundId;
+        _transferToId = State.RootFunds.Skip(1).FirstOrDefault()?.Id ?? _fundId;
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        _error = null;
+        try { await action(); }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private Task OnAccountChange(ChangeEventArgs e) => Run(async () =>
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id)) await State.SwitchAccount(id);
+    });
+
+    private Task AddExpense() => Run(async () =>
+    {
+        if (_amount <= 0) return;
+        await State.AddExpense(_categoryId, _amount, _fundId, _note, _expenseDate);
+        _amount = 0; _note = null; _expenseDate = DateOnly.FromDateTime(DateTime.Today);
+    });
+
+    private Task RecordDeposit(Guid memberId) => Run(async () =>
+    {
+        var amount = _contribAmounts.GetValueOrDefault(memberId);
+        if (amount <= 0) return;
+        await State.RecordDeposit(memberId, amount);
+        _contribAmounts[memberId] = 0;
+    });
+
+    private void OpenEditDeposit(Guid memberId)
+    {
+        _depositMemberId = memberId;
+        _depositAmount = State.ContributionFor(memberId)?.Paid.Amount ?? 0m;
+        _modal = Modal.EditDeposit;
+    }
+
+    private Task SaveEditDeposit() => Run(async () =>
+    {
+        if (_depositAmount < 0) return;
+        await State.EditDeposit(_depositMemberId, _depositAmount);
+        CloseModal();
+    });
+
+    private void OpenDeleteDeposit(Guid memberId) { _depositMemberId = memberId; _modal = Modal.DeleteDeposit; }
+
+    private Task ConfirmDeleteDeposit() => Run(async () =>
+    {
+        await State.RemoveDeposit(_depositMemberId);
+        CloseModal();
+    });
+
+    private void OpenEditSavingDeposit(Guid id)
+    {
+        if (State.FindSavingDeposit(id) is not { } d) return;
+        _savingDepositId = id; _savingDepositAmount = d.Amount.Amount; _savingDepositBucketId = d.SavingCategoryId;
+        _modal = Modal.EditSavingDeposit;
+    }
+
+    private Task SaveEditSavingDeposit() => Run(async () =>
+    {
+        if (_savingDepositAmount <= 0) return;
+        await State.EditSavingDeposit(_savingDepositId, _savingDepositAmount);
+        CloseModal();
+    });
+
+    private void OpenDeleteSavingDeposit(Guid id) { _savingDepositId = id; _modal = Modal.DeleteSavingDeposit; }
+
+    private Task ConfirmDeleteSavingDeposit() => Run(async () =>
+    {
+        await State.RemoveSavingDeposit(_savingDepositId);
+        CloseModal();
+    });
+
+    private void OpenEditSavingMovement(Guid id)
+    {
+        if (State.FindSavingMovement(id) is not { } m) return;
+        _savingMovementId = id;
+        _savingMovementAmount = Math.Abs(m.Amount.Amount);
+        _modal = Modal.EditSavingMovement;
+    }
+
+    private Task SaveEditSavingMovement() => Run(async () =>
+    {
+        if (_savingMovementAmount <= 0) return;
+        await State.EditSavingMovement(_savingMovementId, _savingMovementAmount);
+        CloseModal();
+    });
+
+    private void OpenDeleteSavingMovement(Guid id) { _savingMovementId = id; _modal = Modal.DeleteSavingMovement; }
+
+    private Task ConfirmDeleteSavingMovement() => Run(async () =>
+    {
+        await State.RemoveSavingMovement(_savingMovementId);
+        CloseModal();
+    });
+
+    private Task AllocateSaving() => Run(async () =>
+    {
+        if (_savingAmount <= 0) return;
+        await State.AllocateSaving(_savingBucketId, _savingAmount, null);
+        _savingAmount = 0;
+    });
+
+    private Task MoveSaving() => Run(async () =>
+    {
+        if (_spendAmount <= 0 || _spendDestId == Guid.Empty || _spendDestId == _spendBucketId) return;
+        if (_spendDestId == BudgetingState.CarryoverCategoryId)
+            await State.CoverCarryoverFromSavings(_spendBucketId, _spendAmount);
+        else if (State.SavingBuckets.Any(b => b.Bucket.Id == _spendDestId))
+            await State.MoveSavingToBucket(_spendBucketId, _spendDestId, _spendAmount, null);
+        else
+            await State.ConvertSavingToBudget(_spendBucketId, _spendDestId, _spendAmount, "From savings");
+        _spendAmount = 0;
+    });
+
+    private void OpenNextPeriod()
+    {
+        _copyBudgets = true;
+        _realOpenings.Clear();
+        foreach (var f in State.RootFunds)
+            _realOpenings[f.Id] = State.FundBalance(f.Id).Amount;
+        _modal = Modal.NextPeriod;
+    }
+
+    private Task ConfirmNextPeriod() => Run(async () =>
+    {
+        await State.StartNextPeriod(_copyBudgets, _realOpenings);
+        CloseModal();
+    });
+
+    private void OpenRemovePeriod() => _modal = Modal.RemovePeriod;
+
+    private Task ConfirmRemovePeriod() => Run(async () =>
+    {
+        await State.RemoveLatestPeriod();
+        CloseModal();
+    });
+
+    private void OpenEditPeriod()
+    {
+        _periodFrom = State.Period.From;
+        _periodTo = State.Period.To;
+        _modal = Modal.EditPeriod;
+    }
+
+    private Task SaveEditPeriod() => Run(async () =>
+    {
+        if (_periodTo < _periodFrom) return;
+        await State.ReschedulePeriod(_periodFrom, _periodTo);
+        CloseModal();
+    });
+
+    private void OpenAddExpense(Guid categoryId)
+    {
+        _categoryId = categoryId; _amount = 0; _note = null;
+        _expenseDate = DateOnly.FromDateTime(DateTime.Today);
+        _fundId = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty; _modal = Modal.AddExpense;
+    }
+
+    private Task AddExpenseFromModal() => Run(async () =>
+    {
+        if (_amount <= 0) return;
+        await State.AddExpense(_categoryId, _amount, _fundId, _note, _expenseDate);
+        CloseModal();
+    });
+
+    private void OpenEditExpense(Guid expenseId)
+    {
+        if (State.FindExpense(expenseId) is not { } e) return;
+        _editExpenseId = expenseId;
+        _categoryId = e.CategoryId; _amount = e.Amount.Amount; _fundId = e.FundId; _note = e.Note; _expenseDate = e.Date;
+        _modal = Modal.EditExpense;
+    }
+
+    private Task SaveEditExpense() => Run(async () =>
+    {
+        if (_amount <= 0) return;
+        await State.EditExpense(_editExpenseId, _categoryId, _amount, _fundId, _note, _expenseDate);
+        CloseModal();
+    });
+
+    private void OpenDeleteExpense(Guid expenseId) { _editExpenseId = expenseId; _modal = Modal.DeleteExpense; }
+
+    private Task ConfirmDeleteExpense() => Run(async () =>
+    {
+        await State.RemoveExpense(_editExpenseId);
+        CloseModal();
+    });
+
+    // --- Saving buckets ---------------------------------------------------
+
+    private void OpenAddBucket()
+    {
+        _modalBucketId = Guid.Empty; _fName = null; _goalAmount = 0; _fThreshold = 80; _fNotify = false; _initialSavings = 0;
+        _modal = Modal.AddBucket;
+    }
+
+    private void OpenEditBucket(Guid bucketId)
+    {
+        _modalBucketId = bucketId;
+        var b = State.FindSavingBucket(bucketId);
+        _fName = b?.Name;
+        _goalAmount = b?.GoalAmount ?? 0;
+        _fThreshold = (b?.AlertThreshold ?? 0.80m) * 100m;
+        _fNotify = b?.NotifyOnMilestone ?? false;
+        _initialSavings = b?.InitialAmount ?? 0;
+        _modal = Modal.EditBucket;
+    }
+
+    private Task SaveBucket() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_fName)) return;
+        decimal? goal = _goalAmount > 0 ? _goalAmount : null;
+        if (_modal == Modal.AddBucket)
+            await State.AddSavingBucket(_fName!, goal, _fThreshold, _fNotify, _initialSavings);
+        else
+            await State.SaveSavingBucket(_modalBucketId, _fName!, goal, _fThreshold, _fNotify, _initialSavings);
+        CloseModal();
+    });
+
+    private void OpenDeleteBucket(Guid bucketId) { _modalBucketId = bucketId; _modal = Modal.DeleteBucket; }
+
+    private Task ConfirmDeleteBucket() => Run(async () =>
+    {
+        await State.RemoveSavingBucket(_modalBucketId);
+        CloseModal();
+    });
+
+    // --- Funds ------------------------------------------------------------
+
+    private void OpenAddFund()
+    {
+        _modalFundId = Guid.Empty; _fundParentId = null; _fName = null; _openingAmount = 0; _modal = Modal.AddFund;
+    }
+
+    private void OpenAddSubFund(Guid parentId)
+    {
+        _modalFundId = Guid.Empty; _fundParentId = parentId; _fName = null; _openingAmount = 0; _modal = Modal.AddFund;
+    }
+
+    private void OpenEditFund(Guid fundId)
+    {
+        _modalFundId = fundId;
+        _fName = State.FundName(fundId);
+        _openingAmount = State.FundOpeningBalance(fundId).Amount;
+        _modal = Modal.EditFund;
+    }
+
+    private Task SaveFund() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_fName)) return;
+        if (_modal == Modal.AddFund)
+        {
+            var id = await State.AddFund(_fName!, _fundParentId);
+            if (_openingAmount > 0)
+                await State.SetFundOpeningBalance(id, _openingAmount);
+        }
+        else
+        {
+            await State.RenameFund(_modalFundId, _fName!);
+            await State.SetFundOpeningBalance(_modalFundId, _openingAmount);
+        }
+        CloseModal();
+    });
+
+    private void OpenDeleteFund(Guid fundId)
+    {
+        _modalFundId = fundId;
+        _moveBalanceToId = Guid.Empty; // default: don't move (transfer is opt-in)
+        _modal = Modal.DeleteFund;
+    }
+
+    private Task ConfirmDeleteFund() => Run(async () =>
+    {
+        Guid? moveTo = _moveBalanceToId == Guid.Empty ? null : _moveBalanceToId;
+        await State.RemoveFund(_modalFundId, moveTo);
+        CloseModal();
+    });
+
+    private Task Transfer() => Run(async () =>
+    {
+        if (_transferAmount <= 0 || _transferFromId == _transferToId) return;
+        await State.TransferFunds(_transferFromId, _transferToId, _transferAmount, null);
+        _transferAmount = 0;
+    });
+
+    private void OpenEditTransfer(Guid id)
+    {
+        if (State.FindFundTransfer(id) is not { } t) return;
+        _editTransferId = id;
+        _editTransferFromId = t.FromFundId; _editTransferToId = t.ToFundId;
+        _editTransferAmount = t.Amount.Amount; _editTransferNote = t.Note;
+        _modal = Modal.EditTransfer;
+    }
+
+    private Task SaveEditTransfer() => Run(async () =>
+    {
+        if (_editTransferAmount <= 0 || _editTransferFromId == _editTransferToId) return;
+        await State.EditFundTransfer(_editTransferId, _editTransferFromId, _editTransferToId, _editTransferAmount, _editTransferNote);
+        CloseModal();
+    });
+
+    private void OpenDeleteTransfer(Guid id) { _editTransferId = id; _modal = Modal.DeleteTransfer; }
+
+    private Task ConfirmDeleteTransfer() => Run(async () =>
+    {
+        await State.RemoveFundTransfer(_editTransferId);
+        CloseModal();
+    });
+
+    private void OpenTransferOut()
+    {
+        _extFromFundId = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
+        _extToAccountId = State.TransferableAccounts.FirstOrDefault()?.Id ?? Guid.Empty;
+        _extAmount = 0; _extNote = null;
+        _modal = Modal.TransferOut;
+    }
+
+    private Task ConfirmTransferOut() => Run(async () =>
+    {
+        if (_extAmount <= 0 || _extToAccountId == Guid.Empty) return;
+        await State.TransferToAccount(_extToAccountId, _extFromFundId, _extAmount, _extNote);
+        CloseModal();
+    });
+
+    private void OpenDeleteExternalTransfer(Guid id) { _extTransferId = id; _modal = Modal.DeleteExternalTransfer; }
+
+    private Task ConfirmDeleteExternalTransfer() => Run(async () =>
+    {
+        await State.RemoveExternalTransfer(_extTransferId);
+        CloseModal();
+    });
+
+    // --- Modals -----------------------------------------------------------
+
+    private void OpenAdd(Guid? parentId)
+    {
+        _addParentId = parentId; _fName = null; _fBudget = 0; _modal = Modal.AddCat;
+    }
+
+    private void OpenAddSub(Guid parentId) => OpenAdd(parentId);
+
+    private void OpenEdit(Guid categoryId)
+    {
+        _modalCatId = categoryId;
+        _fName = State.CategoryName(categoryId);
+        var b = State.BudgetFor(categoryId);
+        _fBudget = b?.Allocated.Amount ?? 0;
+        _fThreshold = (b?.AlertThreshold ?? 0.80m) * 100m;
+        _fNotify = b?.NotifyOnEveryExpense ?? false;
+        _modal = Modal.EditCat;
+    }
+
+    private void OpenDelete(Guid categoryId) { _modalCatId = categoryId; _modal = Modal.DeleteCat; }
+    private void OpenAddAccount() { _fName = null; _fCurrency = State.Currency; _modal = Modal.AddAccount; }
+    private void OpenEditAccount() { _fName = State.Account.Name; _modal = Modal.EditAccount; }
+    private void OpenDeleteAccount() => _modal = Modal.DeleteAccount;
+    private void OpenInvite() { _inviteUsername = null; _inviteMessage = null; _modal = Modal.Invite; }
+    private void CloseModal() => _modal = Modal.None;
+
+    private Task SendInvite() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_inviteUsername)) return;
+        await State.InviteToCurrentAccount(_inviteUsername!.Trim());
+        _inviteMessage = $"Invitation sent to {_inviteUsername!.Trim()}.";
+        _inviteUsername = null;
+    });
+
+    private Task SaveEditAccount() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_fName)) return;
+        await State.RenameAccount(_fName!);
+        CloseModal();
+    });
+
+    private Task ConfirmDeleteAccount() => Run(async () =>
+    {
+        await State.RemoveAccount(State.CurrentAccountId);
+        CloseModal();
+    });
+
+    private Task SaveAddCat() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_fName)) return;
+        var newId = await State.AddCategory(_fName!, _addParentId);
+        if (_fBudget > 0)
+            await State.SaveBudget(newId, _fBudget, 80, false);
+        CloseModal();
+    });
+
+    private Task SaveEditCat() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_fName)) return;
+        await State.RenameCategory(_modalCatId, _fName!);
+        if (_fBudget > 0)
+            await State.SaveBudget(_modalCatId, _fBudget, _fThreshold, _fNotify);
+        CloseModal();
+    });
+
+    private Task RemoveBudget() => Run(async () =>
+    {
+        await State.RemoveBudget(_modalCatId);
+        CloseModal();
+    });
+
+    private Task ConfirmDelete() => Run(async () =>
+    {
+        await State.RemoveCategory(_modalCatId);
+        CloseModal();
+    });
+
+    private Task SaveAddAccount() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_fName)) return;
+        await State.AddAccount(_fName!, string.IsNullOrWhiteSpace(_fCurrency) ? "EUR" : _fCurrency!);
+        CloseModal();
+    });
+
+    private Task CreateFirstAccount() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_fName)) return;
+        await State.AddAccount(_fName!, string.IsNullOrWhiteSpace(_fCurrency) ? "EUR" : _fCurrency!);
+    });
+
+    private static string Fmt(Money m)
+    {
+        var symbol = m.Currency switch { "EUR" => "€", "USD" => "$", "GBP" => "£", _ => m.Currency + " " };
+        return $"{symbol}{m.Amount:N2}";
+    }
+
+    /// <summary>Indent a category name in a flat &lt;select&gt; so the tree shape reads (sub-categories under parents).</summary>
+    private static string IndentLabel(string name, int depth) =>
+        depth == 0 ? name : new string(' ', depth * 3) + "↳ " + name;
+
+    private static string PctOrDash(decimal? ratio) =>
+        ratio is { } r ? $"{decimal.Round(r * 100m, 0, MidpointRounding.AwayFromZero)}%" : "—";
+
+    public void Dispose() => State.Changed -= OnChanged;
+}

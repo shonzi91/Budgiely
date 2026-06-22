@@ -1,0 +1,28 @@
+## .NET / Visual Studio
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.suo
+.vs/
+*.userprefs
+
+## Rider
+.idea/
+
+## Test results
+[Tt]est[Rr]esults/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+
+## Local secrets / app data (never commit financial data)
+*.db
+*.db-shm
+*.db-wal
+appsettings.*.local.json
+secrets.json
