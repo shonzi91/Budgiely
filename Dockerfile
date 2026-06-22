@@ -4,7 +4,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Publishing a Blazor WASM app needs the wasm-tools workload (IL trimming + brotli precompression).
+# The Blazor WASM publish relinks the runtime with Emscripten (emcc), which needs python.
+# The SDK image doesn't ship it, so the publish fails with "unable to find python in $PATH".
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Publishing a Blazor WASM app needs the wasm-tools workload (IL trimming + native relink).
 RUN dotnet workload install wasm-tools
 
 # NuGet.config pins restore to nuget.org (the corporate feed is unreachable / slow).
