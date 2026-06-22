@@ -7,9 +7,12 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// Where the FinApp sync server lives. Read from wwwroot/appsettings.json ("ApiBaseUrl"),
-// falling back to the local dev server so a plain `dotnet run` works out of the box.
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5179";
+// Where the FinApp sync server lives. Read from wwwroot/appsettings[.Development].json ("ApiBaseUrl").
+// When unset, fall back to this app's own origin — the one-origin deployment where the server hosts
+// both the API and these static files. Local cross-origin dev sets it in appsettings.Development.json.
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"];
+if (string.IsNullOrWhiteSpace(apiBaseUrl))
+    apiBaseUrl = builder.HostEnvironment.BaseAddress;
 
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
 builder.Services.AddSingleton(new ClientOptions { BaseUrl = apiBaseUrl });

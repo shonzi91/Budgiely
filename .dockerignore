@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.git/
+.git/
+.github/
+.claude/
+tests/
+**/*.user
+**/*.db
+**/*.db-shm
+**/*.db-wal
+web-out.log
+web-err.log
+HANDOFF.md

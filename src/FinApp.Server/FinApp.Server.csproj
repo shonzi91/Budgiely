@@ -10,10 +10,13 @@
     <ProjectReference Include="..\FinApp.Domain\FinApp.Domain.csproj" />
     <ProjectReference Include="..\FinApp.Persistence\FinApp.Persistence.csproj" />
     <ProjectReference Include="..\FinApp.Contracts\FinApp.Contracts.csproj" />
+    <!-- One-origin hosting: bundle the Blazor WASM client into the server's wwwroot. -->
+    <ProjectReference Include="..\FinApp.App.Web\FinApp.App.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.6" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.6" />
   </ItemGroup>
 
 </Project>

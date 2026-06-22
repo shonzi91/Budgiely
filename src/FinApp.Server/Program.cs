@@ -24,6 +24,17 @@ builder.Services.AddDbContext<FinAppDbContext>(o => o.UseSqlite(connectionString
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
 
+// Refuse to start in production with the dev placeholder signing key. Set a real one via the
+// Jwt__Key environment variable (>= 32 chars). The placeholder is fine for local development.
+const string DevJwtKeyPlaceholder = "dev-only-finapp-signing-key-change-me-in-production-please";
+if (!builder.Environment.IsDevelopment() &&
+    (string.IsNullOrWhiteSpace(jwt.Key) || jwt.Key == DevJwtKeyPlaceholder || jwt.Key.Length < 32))
+{
+    throw new InvalidOperationException(
+        "Jwt:Key must be set to a real secret (>= 32 chars) outside Development. " +
+        "Provide it via the Jwt__Key environment variable.");
+}
+
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
@@ -92,7 +103,15 @@ app.Use(async (context, next) =>
     }
 });
 
-app.UseCors(WasmCorsPolicy);
+// One-origin hosting: serve the Blazor WASM client (_framework + wwwroot assets) as static files.
+// Placed before auth so the app shell loads without a token.
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();
+
+// CORS is only needed when the web client runs on a separate origin (local two-terminal dev).
+// In a one-origin deployment the client and API share an origin, so it's a no-op there.
+if (app.Environment.IsDevelopment())
+    app.UseCors(WasmCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -169,6 +188,9 @@ invitations.MapPost("/{id:guid}/decline", async (Guid id, ClaimsPrincipal user, 
 });
 
 app.MapHub<SyncHub>("/hubs/sync").RequireAuthorization();
+
+// SPA fallback: any non-API route serves the WASM client's index.html (client-side routing).
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

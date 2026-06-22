@@ -253,11 +253,35 @@ Builds clean; **98 tests still pass** (74 + 5 + 19). Both apps were left running
     one auth-gated shell. MAUI `Routes.razor` now points at `FinApp.Shared.UI.Layout.MainLayout`.
 - **Server CORS** for dev: `Program.cs` adds a `"wasm"` policy (origins from `Cors:AllowedOrigins`, default
   `http://localhost:5080`, `AllowCredentials` for SignalR), `app.UseCors` before auth. One-origin prod hosting stays for #2.
-- **Verified (shell-level):** web serves `index.html`/`_framework/blazor.webassembly.js`/`appsettings.json` (200s);
-  CORS preflight `:5080`→`:5179` returns 204 with `Allow-Origin: http://localhost:5080` + `Allow-Credentials: true`.
-  **Not yet done:** in-browser register→login→dashboard click-through (same `Shared.UI` as the working MAUI app, so low risk).
+- **Verified end-to-end in a browser:** WASM boots, `WebTokenStore` restored a persisted token from `localStorage`,
+  `/me` validated it, and the full Dashboard loaded real account data over CORS (`:5080`→`:5179` preflight returns 204).
 - **Run the web app:** `dotnet run --project src\FinApp.App.Web\FinApp.App.Web.csproj` (after the server) → http://localhost:5080.
 - **iOS/Android** remain the commented phone TFMs in `FinApp.App.Maui.csproj` — reuse `Shared.UI` as-is when enabling them.
+
+## Session 7 — one-origin deploy + Docker (2026-06-22, roadmap #2 DONE)
+Packaged the app to deploy as a **single container** that serves the API + SignalR hub + WASM UI on one origin
+(no CORS in prod). **98 tests still pass.** Docker isn't installed on this machine, so the image build itself is
+unverified locally — but one-origin hosting was verified by running the server in Development.
+- **Server hosts the WASM (`FinApp.Server`):** added `ProjectReference` to `FinApp.App.Web` +
+  `Microsoft.AspNetCore.Components.WebAssembly.Server` 9.0.6. `Program.cs` now does `UseBlazorFrameworkFiles()` +
+  `UseStaticFiles()` (before auth) and `MapFallbackToFile("index.html")` (after the hub) for SPA routing. **CORS is now
+  Development-only** (`if (app.Environment.IsDevelopment()) app.UseCors(...)`). Publishing the server bundles the WASM
+  client's `wwwroot`/`_framework` automatically via the project ref.
+- **Client same-origin by default:** `FinApp.App.Web/Program.cs` uses `ApiBaseUrl` when set, else
+  `builder.HostEnvironment.BaseAddress`. `wwwroot/appsettings.json` → `ApiBaseUrl: ""` (prod one-origin);
+  `wwwroot/appsettings.Development.json` → `http://localhost:5179` (local cross-origin two-terminal dev).
+- **Server config split:** dev-only `Urls` (`:5179`) + `Cors:AllowedOrigins` (`:5080`) moved to a new server
+  `appsettings.Development.json`; prod `appsettings.json` is clean (binds via `ASPNETCORE_URLS`, default `http://+:8080`
+  in the image). **JWT guard:** the server **refuses to start outside Development** if `Jwt:Key` is empty/placeholder/<32
+  chars — set `Jwt__Key` at runtime.
+- **Container:** multi-stage [`Dockerfile`](Dockerfile) (SDK stage installs `wasm-tools`, publishes the server) + `.dockerignore`.
+  SQLite at `/data/finapp-server.db` on a **mounted volume** (`ConnectionStrings__FinApp` env, default points there);
+  EF migrations apply on startup. Full deploy guide + per-platform notes (Fly.io/Render/Azure/VPS) in [`DEPLOY.md`](DEPLOY.md).
+- **Verified (Development run of the server):** `GET /` → 200 WASM shell; `/_framework/blazor.webassembly.js` → 200;
+  client `appsettings.json` served; `GET /accounts` → 401 (API routing + auth intact); `GET /some/client/route` → 200 shell
+  (SPA fallback). **Not verified locally:** `docker build` (no Docker here) and a real cloud deploy (needs your host creds).
+- **Run one container locally (on a machine with Docker):**
+  `docker build -t finapp . && docker run -p 8080:8080 -e Jwt__Key="$(openssl rand -base64 48)" -v finapp-data:/data finapp`
 
 ## Next sessions roadmap (planned 2026-06-19) — confirm scope/order with the user before starting
 
@@ -280,7 +304,7 @@ These are the agreed next big pieces, roughly in dependency order. Each is a mul
   (see deploy item).
 - iOS/Android later = uncomment the phone TFMs, provision the SDKs + signing, and reuse Shared.UI as-is.
 
-### 2. Deploy the web app together with the database
+### 2. Deploy the web app together with the database — ✅ DONE (Session 7, 2026-06-22) — see DEPLOY.md
 - **One-origin deploy (recommended):** have `FinApp.Server` serve the Blazor WASM build from `wwwroot`
   (`UseBlazorFrameworkFiles()` + `MapFallbackToFile("index.html")`) so a single deployment serves the API + SignalR hub +
   web UI on one origin (no CORS). Alternatively host WASM on static/CDN and keep the API separate (then needs CORS).
