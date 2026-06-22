@@ -7,7 +7,7 @@ using FinApp.Domain.Funds;
 using FinApp.Domain.Periods;
 using FinApp.Domain.Savings;
 
-namespace FinApp.Persistence;
+namespace FinApp.Contracts;
 
 /// <summary>
 /// Serializes a full <see cref="Account"/> aggregate to/from JSON, <b>preserving every entity id</b> so
@@ -18,6 +18,9 @@ namespace FinApp.Persistence;
 /// Entities are rebuilt through their normal constructors (so invariants hold for the simple fields) and a
 /// tiny reflection helper restores the bits constructors don't take: the <see cref="Entity.Id"/>, a closed
 /// period's status / carried-in amount, and the private child collections.
+///
+/// Lives in <c>FinApp.Contracts</c> (Domain-only deps, no EF/SQLite) so both the SQLite-backed MAUI host and
+/// the SQLite-free Blazor WASM host can use it.
 /// </summary>
 public static class AccountSnapshotSerializer
 {

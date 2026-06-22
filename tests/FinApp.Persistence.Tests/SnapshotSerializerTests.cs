@@ -2,6 +2,7 @@ using FinApp.Domain.Accounts;
 using FinApp.Domain.Budgeting;
 using FinApp.Domain.Common;
 using FinApp.Domain.Periods;
+using FinApp.Contracts;
 using FinApp.Persistence;
 using Xunit;
 

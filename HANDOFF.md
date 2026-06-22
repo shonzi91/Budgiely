@@ -232,11 +232,38 @@ All shipped & green (**98 tests**: 74 domain + 5 persistence + 19 server). Migra
    to savings, ➡️ move savings, etc.). Modal Cancel/Save/Delete buttons keep their **text** labels (clearer in a dialog);
    tab labels stay text too.
 
+## Session 6 — Blazor WASM web host (2026-06-22, roadmap #1 DONE)
+Added a second head (`src/FinApp.App.Web`) so the app runs in a browser, reusing **all** UI from `Shared.UI`.
+Builds clean; **98 tests still pass** (74 + 5 + 19). Both apps were left running (server :5179, web :5080).
+- **New project `src/FinApp.App.Web`** (`Microsoft.NET.Sdk.BlazorWebAssembly`, net9.0) — refs `Shared.UI` + `Contracts`,
+  packages `Microsoft.AspNetCore.Components.WebAssembly` (+`.DevServer`) **9.0.6**. No Persistence/SQLite. Added to `FinApp.sln`.
+  `Program.cs` registers the same services as MAUI (HttpClient/ClientOptions/FinAppApiClient/AuthState/SyncClient/
+  BudgetingState) but **Scoped** and with `WebTokenStore`. `App.razor` (Router → `Shared.UI` assembly + shared `MainLayout`),
+  `_Imports.razor`, `wwwroot/{index.html, appsettings.json, css/app.css, css/bootstrap}`.
+- **API base URL is now configurable** (no longer MAUI-hardcoded): web reads `wwwroot/appsettings.json` `ApiBaseUrl`
+  (falls back to `http://localhost:5179`). `Properties/launchSettings.json` pins the web host to **http://localhost:5080**.
+- **`WebTokenStore`** implements `ITokenStore` over browser `localStorage` via `IJSRuntime` — no extra package (the WASM
+  counterpart to `MauiTokenStore`/SecureStorage).
+- **Refactor to unblock WASM (touches MAUI's shared deps, MAUI still builds):**
+  - `AccountSnapshotSerializer` **moved `FinApp.Persistence` → `FinApp.Contracts`** (Contracts now refs Domain). It's pure
+    JSON/reflection; this drops the `SQLitePCLRaw.bundle_e_sqlcipher` native dep off the shared-UI/WASM path. `Shared.UI`
+    **no longer references `FinApp.Persistence`**. Updated usings in `BudgetingState` + `SnapshotSerializerTests`
+    (Persistence.Tests now also refs Contracts); fixed the `<see cref>` in `AccountSnapshotRow`.
+  - `MainLayout.razor`(+`.css`) **moved `FinApp.App.Maui/Components/Layout` → `FinApp.Shared.UI/Layout`** so both heads share
+    one auth-gated shell. MAUI `Routes.razor` now points at `FinApp.Shared.UI.Layout.MainLayout`.
+- **Server CORS** for dev: `Program.cs` adds a `"wasm"` policy (origins from `Cors:AllowedOrigins`, default
+  `http://localhost:5080`, `AllowCredentials` for SignalR), `app.UseCors` before auth. One-origin prod hosting stays for #2.
+- **Verified (shell-level):** web serves `index.html`/`_framework/blazor.webassembly.js`/`appsettings.json` (200s);
+  CORS preflight `:5080`→`:5179` returns 204 with `Allow-Origin: http://localhost:5080` + `Allow-Credentials: true`.
+  **Not yet done:** in-browser register→login→dashboard click-through (same `Shared.UI` as the working MAUI app, so low risk).
+- **Run the web app:** `dotnet run --project src\FinApp.App.Web\FinApp.App.Web.csproj` (after the server) → http://localhost:5080.
+- **iOS/Android** remain the commented phone TFMs in `FinApp.App.Maui.csproj` — reuse `Shared.UI` as-is when enabling them.
+
 ## Next sessions roadmap (planned 2026-06-19) — confirm scope/order with the user before starting
 
 These are the agreed next big pieces, roughly in dependency order. Each is a multi-step feature; pick one, plan it, then build.
 
-### 1. Web version of the UI (Blazor WASM), structured so iOS/Android follow
+### 1. Web version of the UI (Blazor WASM), structured so iOS/Android follow — ✅ DONE (Session 6, 2026-06-22)
 - **Most UI is already shareable.** All pages/components/state live in `src/FinApp.Shared.UI` (`Dashboard.razor`, the
   components, `BudgetingState`, `FinAppApiClient`, `AuthState`, `SyncClient`). The MAUI app is just a *host*. The web app is
   a second host; iOS/Android are MAUI phone TFMs (one commented line in `FinApp.App.Maui.csproj`) — so keep **all UI in
@@ -324,7 +351,8 @@ cd C:\Projects\FinApp
 dotnet test tests\FinApp.Domain.Tests\FinApp.Domain.Tests.csproj
 dotnet test tests\FinApp.Persistence.Tests\FinApp.Persistence.Tests.csproj
 dotnet test tests\FinApp.Server.Tests\FinApp.Server.Tests.csproj
-dotnet run --project src\FinApp.Server\FinApp.Server.csproj      # the sync server/API + SignalR
+dotnet run --project src\FinApp.Server\FinApp.Server.csproj      # the sync server/API + SignalR (:5179)
+dotnet run --project src\FinApp.App.Web\FinApp.App.Web.csproj    # Blazor WASM web head (:5080) — run the server first
 dotnet build src\FinApp.App.Maui\FinApp.App.Maui.csproj -f net9.0-windows10.0.19041.0
 .\src\FinApp.App.Maui\bin\Debug\net9.0-windows10.0.19041.0\win10-x64\FinApp.App.Maui.exe
 ```

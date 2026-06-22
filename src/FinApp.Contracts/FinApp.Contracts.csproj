@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\FinApp.Domain\FinApp.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

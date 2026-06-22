@@ -33,6 +33,14 @@ builder.Services.AddScoped<InvitationService>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<SyncNotifier>();
 
+// CORS for the Blazor WASM web host (different origin from the API in dev).
+// SignalR needs an explicit origin list + AllowCredentials (can't use AllowAnyOrigin with credentials).
+const string WasmCorsPolicy = "wasm";
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                  ?? ["http://localhost:5080"];
+builder.Services.AddCors(o => o.AddPolicy(WasmCorsPolicy, p =>
+    p.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -83,6 +91,8 @@ app.Use(async (context, next) =>
         await context.Response.WriteAsJsonAsync(new { error = ex.Message });
     }
 });
+
+app.UseCors(WasmCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();

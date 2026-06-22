@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FinApp.Domain\FinApp.Domain.csproj" />
-    <ProjectReference Include="..\FinApp.Persistence\FinApp.Persistence.csproj" />
     <ProjectReference Include="..\FinApp.Contracts\FinApp.Contracts.csproj" />
   </ItemGroup>
 

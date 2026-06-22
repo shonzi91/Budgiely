@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FinApp.Persistence\FinApp.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\FinApp.Contracts\FinApp.Contracts.csproj" />
     <ProjectReference Include="..\..\src\FinApp.Domain\FinApp.Domain.csproj" />
   </ItemGroup>
 

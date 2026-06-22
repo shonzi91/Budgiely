@@ -6,7 +6,6 @@ using FinApp.Domain.Funds;
 using FinApp.Domain.Periods;
 using FinApp.Domain.Savings;
 using FinApp.Domain.Services;
-using FinApp.Persistence;
 
 namespace FinApp.Shared.UI.Services;
 
