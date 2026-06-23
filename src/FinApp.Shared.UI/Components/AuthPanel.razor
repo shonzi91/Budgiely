@@ -16,17 +16,17 @@
 
     @if (_mode == Mode.Login)
     {
-        <label>Username or email <input @bind="_identifier" @bind:event="oninput" /></label>
-        <label>Password <input type="password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
+        <label>Username or email <input type="text" placeholder="you@example.com or username" autocomplete="username" @bind="_identifier" @bind:event="oninput" /></label>
+        <label>Password <input type="password" placeholder="Your password" autocomplete="current-password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
         <button class="primary" @onclick="SignIn" disabled="@(_busy || string.IsNullOrWhiteSpace(_identifier) || string.IsNullOrEmpty(_password))">
             @(_busy ? "Signing in…" : "Sign in")
         </button>
     }
     else
     {
-        <label>Username <input @bind="_username" @bind:event="oninput" /></label>
-        <label>Email <input @bind="_email" @bind:event="oninput" /></label>
-        <label>Password <input type="password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
+        <label>Username <input type="text" placeholder="Pick a username" autocomplete="username" @bind="_username" @bind:event="oninput" /></label>
+        <label>Email <input type="email" placeholder="you@example.com" autocomplete="email" @bind="_email" @bind:event="oninput" /></label>
+        <label>Password <input type="password" placeholder="At least 8 characters" autocomplete="new-password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
         <button class="primary" @onclick="Register" disabled="@(_busy || !CanRegister)">
             @(_busy ? "Creating…" : "Create account")
         </button>
@@ -58,6 +58,7 @@
         _error = null;
         _busy = true;
         try { await action(); }
+        catch (HttpRequestException) { _error = "Couldn’t reach the server. Check your connection and try again."; }
         catch (Exception ex) { _error = ex.Message; }
         finally { _busy = false; }
     }

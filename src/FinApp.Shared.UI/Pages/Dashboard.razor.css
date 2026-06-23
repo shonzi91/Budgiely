@@ -218,9 +218,16 @@ button.link { background: none; border: none; color: #4f46e5; font-weight: 600; 
 }
 .modal h3 { margin: 0 0 4px; font-size: 1.1rem; }
 .modal label { display: flex; flex-direction: column; gap: 4px; font-size: .82rem; color: #6b7280; }
-.modal label input[type=text], .modal label input[type=number], .modal label select {
+.modal label input[type=text], .modal label input[type=number], .modal label input[type=date], .modal label select {
     padding: 9px 10px; border: 1px solid #d8dce3; border-radius: 10px; font-size: .95rem; background: #fff;
 }
+
+/* Date pickers: consistent field height + a tidy, brand-tinted calendar button. */
+input[type=date] { color-scheme: light; accent-color: #4f46e5; font-family: inherit; min-height: 38px; }
+input[type=date]::-webkit-calendar-picker-indicator {
+    cursor: pointer; opacity: .55; padding: 3px; border-radius: 6px;
+}
+input[type=date]::-webkit-calendar-picker-indicator:hover { opacity: 1; background: #eef0fb; }
 .modal .check { flex-direction: row; align-items: center; color: #1f2430; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .modal-actions button {
