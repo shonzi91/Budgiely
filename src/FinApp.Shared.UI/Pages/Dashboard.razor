@@ -2,6 +2,11 @@
 @implements IDisposable
 @inject BudgetingState State
 
+@if (_busy)
+{
+    <div class="saving-pill">Saving…</div>
+}
+
 @if (!State.IsReady)
 {
     <p class="loading">Loading…</p>
@@ -14,7 +19,7 @@ else if (!State.HasAccounts)
         <p>Create your first account to get started (e.g. Personal, Shared, Family).</p>
         @if (_error is not null)
         {
-            <div class="alert warn-bg">@_error</div>
+            <div class="alert warn-bg"><span>@_error</span><button class="alert-x" title="Dismiss" @onclick="() => _error = null">×</button></div>
         }
         <div class="firstrun-form">
             <label>Account name <input type="text" placeholder="Personal" @bind="_fName" /></label>
@@ -26,7 +31,7 @@ else if (!State.HasAccounts)
 }
 else
 {
-<div class="dash">
+<div class="dash @(_busy ? "is-busy" : "")">
     <header class="dash-head">
         <div class="period-nav">
             <button class="nav" title="Previous period" @onclick="State.GoPrev" disabled="@(!State.CanGoPrev)">◀</button>
@@ -83,7 +88,7 @@ else
 
     @if (_error is not null)
     {
-        <div class="alert warn-bg"><strong>Couldn’t do that.</strong> <span>@_error</span></div>
+        <div class="alert warn-bg"><strong>Couldn’t do that.</strong> <span>@_error</span><button class="alert-x" title="Dismiss" @onclick="() => _error = null">×</button></div>
     }
 
     <nav class="tabs">
@@ -269,7 +274,7 @@ else
                                 }
                             </span>
                             <span class="contrib-actions">
-                                <input type="number" step="0.01" min="0" placeholder="amount" @bind:get="GetContribAmount(m.UserId)" @bind:set="v => SetContribAmount(m.UserId, v)" />
+                                <input type="number" step="0.01" min="0" placeholder="Amount" @bind:get="GetContribAmount(m.UserId)" @bind:set="v => SetContribAmount(m.UserId, v)" />
                                 <button class="ghost" @onclick="() => RecordDeposit(m.UserId)" disabled="@State.HasUnallocatedFunds" title="@(State.HasUnallocatedFunds ? "Allocate existing funds first" : null)">Deposit</button>
                             </span>
                         </li>
@@ -1033,6 +1038,7 @@ else
     private string? _fCurrency = "EUR";
 
     private string? _error;
+    private bool _busy;
 
     protected override async Task OnInitializedAsync()
     {
@@ -1057,10 +1063,27 @@ else
 
     private async Task Run(Func<Task> action)
     {
+        if (_busy) return;                 // ignore re-entrant clicks while a save is already in flight
         _error = null;
+        _busy = true;
+        StateHasChanged();                 // paint the "Saving…" state before the (networked) round-trip
+        await Task.Yield();
         try { await action(); }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = Describe(ex); }
+        finally { _busy = false; }
     }
+
+    /// <summary>Turn an exception into a message a person can act on (instead of raw .NET text).</summary>
+    private static string Describe(Exception ex) => ex switch
+    {
+        ApiException { Status: System.Net.HttpStatusCode.Conflict } =>
+            "Someone else updated this account just now. Reload and try again.",
+        ApiException { Status: System.Net.HttpStatusCode.Unauthorized } =>
+            "Your session has expired — please sign out and back in.",
+        ApiException api => api.Message,
+        HttpRequestException => "Couldn’t reach the server. Check your connection and try again.",
+        _ => ex.Message,
+    };
 
     private Task OnAccountChange(ChangeEventArgs e) => Run(async () =>
     {
