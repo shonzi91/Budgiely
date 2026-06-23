@@ -3,20 +3,28 @@ using FinApp.Domain.Common;
 namespace FinApp.Domain.Periods;
 
 /// <summary>
-/// A member's deposit into a period — how much they have actually put in. There are no pledges or
-/// due dates: deposits are recorded directly as money comes in.
+/// A member's deposit into a period — how much they have actually put in, classified by an optional
+/// contribution <see cref="CategoryId"/> (Salary, Vouchers…) and attributed to a <see cref="FundId"/>
+/// (the deposited money lands in that fund). Deposits with the same (member, category, fund) merge into
+/// one row; different combinations are separate rows. There are no pledges or due dates.
 /// </summary>
 public sealed class Contribution : Entity
 {
     public Guid MemberId { get; }
+    public Guid CategoryId { get; private set; }
+    public Guid FundId { get; private set; }
+    public DateOnly Date { get; private set; }
     public Money Paid { get; private set; }
 
-    public Contribution(Guid memberId, Money paid)
+    public Contribution(Guid memberId, Money paid, Guid categoryId = default, Guid fundId = default, DateOnly date = default)
     {
         if (paid.IsNegative)
             throw new ArgumentException("Deposited amount cannot be negative.", nameof(paid));
         MemberId = memberId;
         Paid = paid;
+        CategoryId = categoryId;
+        FundId = fundId;
+        Date = date;
     }
 
     public void RecordPayment(Money amount)
@@ -32,5 +40,14 @@ public sealed class Contribution : Entity
         if (amount.IsNegative)
             throw new ArgumentException("Deposited amount cannot be negative.", nameof(amount));
         Paid = amount;
+    }
+
+    /// <summary>Overwrite all editable fields of a deposit row.</summary>
+    public void Update(Money amount, Guid categoryId, Guid fundId, DateOnly date)
+    {
+        SetPaid(amount);
+        CategoryId = categoryId;
+        FundId = fundId;
+        Date = date;
     }
 }

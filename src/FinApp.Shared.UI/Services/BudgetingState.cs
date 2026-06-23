@@ -360,6 +360,19 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     /// <summary>Who the current actions are attributed to — the signed-in user (a member of the account).</summary>
     private Guid CurrentMemberId => auth.UserId;
 
+    // --- Contribution categories + itemized deposits ----------------------
+    public IReadOnlyList<ContributionCategory> ContributionCategories => Account.ContributionCategories;
+    public string ContributionCategoryName(Guid id) =>
+        Account.FindContributionCategory(id)?.Name ?? "—";
+    public string? ContributionCategoryRemovalBlocker(Guid id) => Account.ContributionCategoryRemovalBlocker(id);
+
+    /// <summary>This period's real member deposits (excludes the carryover sentinel), newest first.</summary>
+    public IReadOnlyList<Contribution> ContributionsThisPeriod =>
+        Period.Contributions.Where(c => c.MemberId != Period.CarryoverSource)
+            .OrderByDescending(c => c.Date).ToList();
+
+    public Contribution? FindContribution(Guid id) => Period.FindContribution(id);
+
     // --- Commands ---------------------------------------------------------
 
     public Task AddExpense(Guid categoryId, decimal amount, Guid fundId, string? note, DateOnly date)
@@ -380,23 +393,54 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         return SaveAsync();
     }
 
-    public Task RecordDeposit(Guid memberId, decimal amount)
+    /// <summary>Record a deposit for the signed-in user, classified by category and attributed to a fund.</summary>
+    public Task RecordDeposit(Guid categoryId, Guid fundId, decimal amount, DateOnly date)
     {
-        Period.Deposit(memberId, Money(amount));
+        Period.Deposit(CurrentMemberId, Money(amount), categoryId, fundId, date);
         return SaveAsync();
     }
 
-    /// <summary>Overwrite a member's deposited total.</summary>
-    public Task EditDeposit(Guid memberId, decimal amount)
+    /// <summary>Edit one of the signed-in user's own deposit rows.</summary>
+    public Task EditDeposit(Guid contributionId, Guid categoryId, Guid fundId, decimal amount, DateOnly date)
     {
-        Period.SetDeposit(memberId, Money(amount));
+        EnsureOwnContribution(contributionId);
+        Period.EditContribution(contributionId, Money(amount), categoryId, fundId, date);
         return SaveAsync();
     }
 
-    /// <summary>Clear a member's deposit.</summary>
-    public Task RemoveDeposit(Guid memberId)
+    /// <summary>Remove one of the signed-in user's own deposit rows.</summary>
+    public Task RemoveDeposit(Guid contributionId)
     {
-        Period.RemoveDeposit(memberId);
+        EnsureOwnContribution(contributionId);
+        Period.RemoveContribution(contributionId);
+        return SaveAsync();
+    }
+
+    /// <summary>True when the deposit belongs to the signed-in user (only they may edit/remove it).</summary>
+    public bool CanHandleContribution(Contribution c) => c.MemberId == CurrentMemberId;
+
+    private void EnsureOwnContribution(Guid contributionId)
+    {
+        var c = Period.FindContribution(contributionId);
+        if (c is null || !CanHandleContribution(c))
+            throw new InvalidOperationException("You can only change your own contributions.");
+    }
+
+    public Task AddContributionCategory(string name)
+    {
+        Account.AddContributionCategory(name);
+        return SaveAsync();
+    }
+
+    public Task RenameContributionCategory(Guid id, string name)
+    {
+        Account.RenameContributionCategory(id, name);
+        return SaveAsync();
+    }
+
+    public Task RemoveContributionCategory(Guid id)
+    {
+        Account.RemoveContributionCategory(id);
         return SaveAsync();
     }
 
@@ -564,7 +608,8 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         var destAccount = AccountSnapshotSerializer.Deserialize(snapshot.Payload);
         var destPeriod = destAccount.CurrentPeriod
             ?? throw new InvalidOperationException($"“{destination.Name}” has no open period to receive the transfer.");
-        destPeriod.Deposit(auth.UserId, new Money(amount, destAccount.Currency));
+        destPeriod.Deposit(auth.UserId, new Money(amount, destAccount.Currency),
+            fundId: destAccount.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty, date: Today());
         var payload = AccountSnapshotSerializer.Serialize(destAccount);
         await api.SaveSnapshotAsync(destinationAccountId, new SaveAccountRequest(payload, snapshot.Version));
     }
@@ -726,6 +771,8 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         foreach (var c in new[] { "Food", "Bills", "Transport", "Other" })
             account.AddCategory(c);
         account.AddSavingCategory("General");
+        foreach (var c in new[] { "Salary", "Other" })
+            account.AddContributionCategory(c);
         account.AddDefaultFunds();
 
         var today = DateOnly.FromDateTime(DateTime.Today);

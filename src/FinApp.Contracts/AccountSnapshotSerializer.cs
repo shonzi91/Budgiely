@@ -34,7 +34,8 @@ public static class AccountSnapshotSerializer
             account.Funds.Select(f => new FundNode(f.Id, f.Name, f.ParentId)).ToList(),
             account.Categories.Select(c => new CategoryNode(c.Id, c.Name, c.ParentId)).ToList(),
             account.SavingCategories.Select(s => new SavingCategoryNode(s.Id, s.Name, s.ParentId, s.GoalAmount, s.AlertThreshold, s.NotifyOnMilestone, s.InitialAmount)).ToList(),
-            account.Periods.Select(ToNode).ToList());
+            account.Periods.Select(ToNode).ToList(),
+            account.ContributionCategories.Select(c => new ContributionCategoryNode(c.Id, c.Name)).ToList());
         return JsonSerializer.Serialize(node, Json);
     }
 
@@ -64,6 +65,8 @@ public static class AccountSnapshotSerializer
         SetField(account, "_funds", node.Funds.Select(f => Build(new Fund(f.Name, f.ParentId), f.Id)).ToList());
         SetField(account, "_categories", node.Categories.Select(c => Build(new Category(c.Name, c.ParentId), c.Id)).ToList());
         SetField(account, "_savingCategories", node.SavingCategories.Select(ToEntity).ToList());
+        SetField(account, "_contributionCategories",
+            (node.ContributionCategories ?? []).Select(c => Build(new ContributionCategory(c.Name), c.Id)).ToList());
         SetField(account, "_periods", node.Periods.Select(p => ToEntity(p, node.Currency)).ToList());
         return account;
     }
@@ -73,7 +76,7 @@ public static class AccountSnapshotSerializer
     private static PeriodNode ToNode(Period p) => new(
         p.Id, p.Currency, p.From, p.To, p.Status, p.CarriedIn.Amount,
         p.InitialBalances.Select(b => new InitialBalanceNode(b.Id, b.FundId, b.Amount.Amount, b.Informative)).ToList(),
-        p.Contributions.Select(c => new ContributionNode(c.Id, c.MemberId, c.Paid.Amount)).ToList(),
+        p.Contributions.Select(c => new ContributionNode(c.Id, c.MemberId, c.Paid.Amount, c.CategoryId, c.FundId, c.Date)).ToList(),
         p.Budgets.Select(b => new BudgetNode(b.Id, b.CategoryId, b.Allocated.Amount, b.AlertThreshold, b.NotifyOnEveryExpense)).ToList(),
         p.Expenses.Select(e => new ExpenseNode(e.Id, e.CategoryId, e.Amount.Amount, e.Date, e.MemberId, e.FundId, e.Note, e.SourceSavingCategoryId)).ToList(),
         p.SavingAllocations.Select(a => new SavingAllocationNode(a.Id, a.SavingCategoryId, a.Amount.Amount, a.Date, a.Note, a.SourceExpenseId, a.BudgetCategoryId, a.TransferPairId)).ToList(),
@@ -103,7 +106,7 @@ public static class AccountSnapshotSerializer
         if (n.Status == PeriodStatus.Closed) p.Close();
 
         SetField(p, "_initialBalances", n.InitialBalances.Select(b => Build(new InitialBalance(b.FundId, M(b.Amount), b.Informative), b.Id)).ToList());
-        SetField(p, "_contributions", n.Contributions.Where(c => c.MemberId != Period.CarryoverSource).Select(c => Build(new Contribution(c.MemberId, M(c.Paid)), c.Id)).ToList());
+        SetField(p, "_contributions", n.Contributions.Where(c => c.MemberId != Period.CarryoverSource).Select(c => Build(new Contribution(c.MemberId, M(c.Paid), c.CategoryId, c.FundId, c.Date), c.Id)).ToList());
         SetField(p, "_budgets", n.Budgets.Select(b => Build(new Budget(b.CategoryId, M(b.Allocated), b.AlertThreshold, b.NotifyOnEveryExpense), b.Id)).ToList());
         SetField(p, "_expenses", n.Expenses.Select(e => Build(new Expense(e.CategoryId, M(e.Amount), e.Date, e.MemberId, e.FundId, e.Note, e.SourceSavingCategoryId), e.Id)).ToList());
         SetField(p, "_savingAllocations", n.SavingAllocations.Select(a => Build(new SavingAllocation(a.SavingCategoryId, M(a.Amount), a.Date, a.Note, a.SourceExpenseId, a.BudgetCategoryId, a.TransferPairId), a.Id)).ToList());
@@ -142,9 +145,11 @@ public static class AccountSnapshotSerializer
 
     private record AccountNode(Guid Id, string Name, string Currency, Guid OwnerUserId,
         List<MemberNode> Members, List<FundNode> Funds, List<CategoryNode> Categories,
-        List<SavingCategoryNode> SavingCategories, List<PeriodNode> Periods);
+        List<SavingCategoryNode> SavingCategories, List<PeriodNode> Periods,
+        List<ContributionCategoryNode>? ContributionCategories = null);
 
     private record MemberNode(Guid Id, Guid UserId, string DisplayName);
+    private record ContributionCategoryNode(Guid Id, string Name);
     private record FundNode(Guid Id, string Name, Guid? ParentId);
     private record CategoryNode(Guid Id, string Name, Guid? ParentId);
     private record SavingCategoryNode(Guid Id, string Name, Guid? ParentId, decimal? GoalAmount, decimal AlertThreshold, bool NotifyOnMilestone, decimal InitialAmount);
@@ -155,7 +160,8 @@ public static class AccountSnapshotSerializer
         List<ExternalTransferNode>? ExternalTransfers = null);
 
     private record InitialBalanceNode(Guid Id, Guid FundId, decimal Amount, bool Informative);
-    private record ContributionNode(Guid Id, Guid MemberId, decimal Paid);
+    private record ContributionNode(Guid Id, Guid MemberId, decimal Paid,
+        Guid CategoryId = default, Guid FundId = default, DateOnly Date = default);
     private record BudgetNode(Guid Id, Guid CategoryId, decimal Allocated, decimal AlertThreshold, bool NotifyOnEveryExpense);
     private record ExpenseNode(Guid Id, Guid CategoryId, decimal Amount, DateOnly Date, Guid MemberId, Guid FundId, string? Note, Guid? SourceSavingCategoryId);
     private record SavingAllocationNode(Guid Id, Guid SavingCategoryId, decimal Amount, DateOnly Date, string? Note, Guid? SourceExpenseId, Guid? BudgetCategoryId = null, Guid? TransferPairId = null);

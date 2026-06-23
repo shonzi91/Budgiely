@@ -139,7 +139,8 @@ public sealed class Period : Entity
         var transfersOut = Sum(_fundTransfers.Where(t => t.FromFundId == fundId).Select(t => t.Amount));
         var spent = Sum(_expenses.Where(e => e.FundId == fundId).Select(e => e.Amount));
         var sentOut = Sum(_externalTransfers.Where(t => t.FundId == fundId).Select(t => t.Amount));
-        return opening + transfersIn - transfersOut - spent - sentOut;
+        var depositsIn = Sum(_contributions.Where(c => c.MemberId != CarryoverSource && c.FundId == fundId).Select(c => c.Paid));
+        return opening + transfersIn + depositsIn - transfersOut - spent - sentOut;
     }
 
     // --- Transfers to other accounts --------------------------------------
@@ -171,36 +172,44 @@ public sealed class Period : Entity
 
     // --- Contributions ----------------------------------------------------
 
-    /// <summary>Record a member's deposit (creating their contribution on first deposit, adding to it after).</summary>
-    public Contribution Deposit(Guid memberId, Money amount)
+    /// <summary>
+    /// Record a member's deposit, classified by <paramref name="categoryId"/> and attributed to
+    /// <paramref name="fundId"/> (the money lands in that fund). Deposits with the same
+    /// (member, category, fund) merge into one row; different combinations are separate rows.
+    /// </summary>
+    public Contribution Deposit(Guid memberId, Money amount, Guid categoryId = default, Guid fundId = default, DateOnly date = default)
     {
         EnsureCurrency(amount);
-        var existing = _contributions.FirstOrDefault(c => c.MemberId == memberId);
+        var existing = _contributions.FirstOrDefault(c =>
+            c.MemberId == memberId && c.CategoryId == categoryId && c.FundId == fundId);
         if (existing is null)
         {
-            existing = new Contribution(memberId, Money.Zero(Currency));
+            existing = new Contribution(memberId, Money.Zero(Currency), categoryId, fundId, date);
             _contributions.Add(existing);
         }
         existing.RecordPayment(amount);
         return existing;
     }
 
-    /// <summary>Overwrite a member's deposited total (used when editing a deposit).</summary>
-    public void SetDeposit(Guid memberId, Money amount)
+    public Contribution? FindContribution(Guid contributionId) =>
+        _contributions.FirstOrDefault(c => c.Id == contributionId);
+
+    /// <summary>Overwrite a deposit row's amount/category/fund/date (used when editing a deposit).</summary>
+    public void EditContribution(Guid contributionId, Money amount, Guid categoryId, Guid fundId, DateOnly date)
     {
         EnsureCurrency(amount);
         EnsureOpen();
-        var contribution = _contributions.FirstOrDefault(c => c.MemberId == memberId)
-            ?? throw new InvalidOperationException("No contribution exists for this member.");
-        contribution.SetPaid(amount);
+        var contribution = FindContribution(contributionId)
+            ?? throw new InvalidOperationException("Contribution not found in this period.");
+        contribution.Update(amount, categoryId, fundId, date);
     }
 
-    /// <summary>Clear a member's deposit for this period.</summary>
-    public void RemoveDeposit(Guid memberId)
+    /// <summary>Remove a deposit row.</summary>
+    public void RemoveContribution(Guid contributionId)
     {
         EnsureOpen();
-        var contribution = _contributions.FirstOrDefault(c => c.MemberId == memberId)
-            ?? throw new InvalidOperationException("No contribution exists for this member.");
+        var contribution = FindContribution(contributionId)
+            ?? throw new InvalidOperationException("Contribution not found in this period.");
         _contributions.Remove(contribution);
     }
 

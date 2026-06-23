@@ -257,10 +257,11 @@ public class MoneyEnvelopeTests
         var member = account.Members[0].UserId;
         Assert.Equal(M(100), period.ContributionsPaidTotal);
 
-        period.SetDeposit(member, M(250));
+        var contrib = period.Contributions.First(c => c.MemberId == member);
+        period.EditContribution(contrib.Id, M(250), contrib.CategoryId, contrib.FundId, contrib.Date);
         Assert.Equal(M(250), period.ContributionsPaidTotal);
 
-        period.RemoveDeposit(member);
+        period.RemoveContribution(contrib.Id);
         Assert.Equal(M(0), period.ContributionsPaidTotal);
     }
 }

@@ -15,6 +15,7 @@ public sealed class Account : Entity
     private readonly List<AccountMember> _members = [];
     private readonly List<Category> _categories = [];
     private readonly List<SavingCategory> _savingCategories = [];
+    private readonly List<ContributionCategory> _contributionCategories = [];
     private readonly List<Fund> _funds = [];
     private readonly List<Period> _periods = [];
 
@@ -35,6 +36,9 @@ public sealed class Account : Entity
 
     /// <summary>All savings buckets, flat.</summary>
     public IReadOnlyList<SavingCategory> SavingCategories => _savingCategories;
+
+    /// <summary>Account-level contribution categories (Salary, Vouchers…), referenced by id from deposits.</summary>
+    public IReadOnlyList<ContributionCategory> ContributionCategories => _contributionCategories;
 
     /// <summary>All funds (places money lives), flat. Referenced by id from expenses, opening balances and transfers.</summary>
     public IReadOnlyList<Fund> Funds => _funds;
@@ -196,6 +200,44 @@ public sealed class Account : Entity
         var category = FindSavingCategory(savingCategoryId)
             ?? throw new InvalidOperationException("Saving category not found.");
         _savingCategories.Remove(category);
+    }
+
+    // --- Contribution categories -----------------------------------------
+
+    public ContributionCategory AddContributionCategory(string name)
+    {
+        if (_contributionCategories.Any(c => NameEquals(c.Name, name)))
+            throw new InvalidOperationException($"A contribution category named “{name.Trim()}” already exists.");
+        var category = new ContributionCategory(name);
+        _contributionCategories.Add(category);
+        return category;
+    }
+
+    public ContributionCategory? FindContributionCategory(Guid id) => _contributionCategories.FirstOrDefault(c => c.Id == id);
+
+    public void RenameContributionCategory(Guid id, string name)
+    {
+        var category = FindContributionCategory(id) ?? throw new InvalidOperationException("Contribution category not found.");
+        if (_contributionCategories.Any(c => c.Id != id && NameEquals(c.Name, name)))
+            throw new InvalidOperationException($"A contribution category named “{name.Trim()}” already exists.");
+        category.Rename(name);
+    }
+
+    /// <summary>Why a contribution category can't be removed, or null when it can.</summary>
+    public string? ContributionCategoryRemovalBlocker(Guid id)
+    {
+        if (_periods.SelectMany(p => p.Contributions).Any(c => c.CategoryId == id))
+            return "deposits reference it";
+        return null;
+    }
+
+    public void RemoveContributionCategory(Guid id)
+    {
+        var blocker = ContributionCategoryRemovalBlocker(id);
+        if (blocker is not null)
+            throw new InvalidOperationException($"Cannot remove contribution category: {blocker}.");
+        var category = FindContributionCategory(id) ?? throw new InvalidOperationException("Contribution category not found.");
+        _contributionCategories.Remove(category);
     }
 
     // --- Funds ------------------------------------------------------------

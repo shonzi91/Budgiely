@@ -253,36 +253,57 @@ else
                 {
                     <p class="hint warn-text">@Fmt(State.Unallocated) is contributed but not yet allocated. Assign it to a budget or savings before recording more deposits.</p>
                 }
-                <ul class="list">
-                    @foreach (var m in State.Members)
-                    {
-                        var c = State.ContributionFor(m.UserId);
-                        <li class="contrib">
-                            <span class="contrib-name">@m.DisplayName</span>
-                            <span class="contrib-state">
-                                @if (c is null || c.Paid.IsZero)
-                                {
-                                    <em>@Loc["no deposits yet"]</em>
-                                }
-                                else
-                                {
-                                    <span>@Fmt(c.Paid) @Loc["deposited"]</span>
-                                    @if (State.IsPeriodOpen)
-                                    {
-                                        <button class="exp-edit" title="Edit deposit" @onclick="() => OpenEditDeposit(m.UserId)">✏️</button>
-                                        <button class="exp-edit" title="Delete deposit" @onclick="() => OpenDeleteDeposit(m.UserId)">🗑️</button>
-                                    }
-                                }
+
+                @if (State.IsPeriodOpen)
+                {
+                    <div class="form contrib-form">
+                        <select @bind="_depCategoryId">
+                            @foreach (var cc in State.ContributionCategories)
+                            {
+                                <option value="@cc.Id">@cc.Name</option>
+                            }
+                        </select>
+                        <select @bind="_depFundId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                        <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_depAmount" />
+                        <input type="date" @bind="_depDate" min="@State.Period.From.ToString("yyyy-MM-dd")" max="@State.Period.To.ToString("yyyy-MM-dd")" />
+                        <button @onclick="RecordDeposit" disabled="@(_depAmount <= 0 || State.HasUnallocatedFunds)" title="@(State.HasUnallocatedFunds ? "Allocate existing funds first" : null)">@Loc["Deposit"]</button>
+                    </div>
+                    <div class="contrib-cats">
+                        <span class="hint">@Loc["Categories"]:</span>
+                        @foreach (var cc in State.ContributionCategories)
+                        {
+                            <span class="cat-chip">@cc.Name
+                                <button class="exp-edit" title="@Loc["Rename"]" @onclick="() => OpenEditContribCat(cc.Id)">✏️</button>
+                                <button class="exp-edit" title="@Loc["Remove"]" @onclick="() => OpenDeleteContribCat(cc.Id)">🗑️</button>
                             </span>
-                            <span class="contrib-actions">
-                                <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind:get="GetContribAmount(m.UserId)" @bind:set="v => SetContribAmount(m.UserId, v)" />
-                                <button class="ghost" @onclick="() => RecordDeposit(m.UserId)" disabled="@State.HasUnallocatedFunds" title="@(State.HasUnallocatedFunds ? "Allocate existing funds first" : null)">@Loc["Deposit"]</button>
+                        }
+                        <button class="link" @onclick="OpenAddContribCat">➕ @Loc["Add category"]</button>
+                    </div>
+                }
+
+                <ul class="list">
+                    @foreach (var c in State.ContributionsThisPeriod)
+                    {
+                        <li>
+                            <span>@c.Date.ToString("dd MMM") · @State.MemberName(c.MemberId) · @State.ContributionCategoryName(c.CategoryId) · @State.FundName(c.FundId)</span>
+                            <span class="row-actions">
+                                <span class="amt">@Fmt(c.Paid)</span>
+                                @if (State.IsPeriodOpen && State.CanHandleContribution(c))
+                                {
+                                    <button class="exp-edit" title="Edit deposit" @onclick="() => OpenEditDeposit(c.Id)">✏️</button>
+                                    <button class="exp-edit" title="Delete deposit" @onclick="() => OpenDeleteDeposit(c.Id)">🗑️</button>
+                                }
                             </span>
                         </li>
                     }
-                    @if (!State.Members.Any())
+                    @if (!State.ContributionsThisPeriod.Any())
                     {
-                        <li><em>@Loc["No members in this account yet."]</em></li>
+                        <li><em>@Loc["no deposits yet"]</em></li>
                     }
                 </ul>
             </section>
@@ -762,21 +783,63 @@ else
                     break;
 
                 case Modal.EditDeposit:
-                    <h3>Edit deposit — @State.MemberName(_depositMemberId)</h3>
-                    <label>Deposited amount <input type="number" step="0.01" min="0" @bind="_depositAmount" /></label>
+                    <h3>@Loc["Edit deposit"]</h3>
+                    <label>@Loc["Category"]
+                        <select @bind="_editContribCategoryId">
+                            @foreach (var cc in State.ContributionCategories)
+                            {
+                                <option value="@cc.Id">@cc.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>@Loc["Fund"]
+                        <select @bind="_editContribFundId">
+                            @foreach (var f in State.RootFunds)
+                            {
+                                <option value="@f.Id">@f.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label>@Loc["Amount"] <input type="number" step="0.01" min="0" @bind="_editContribAmount" /></label>
+                    <label>@Loc["Date"] <input type="date" @bind="_editContribDate" min="@State.Period.From.ToString("yyyy-MM-dd")" max="@State.Period.To.ToString("yyyy-MM-dd")" /></label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveEditDeposit" disabled="@(_depositAmount < 0)">Save</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveEditDeposit" disabled="@(_editContribAmount <= 0)">@Loc["Save"]</button>
                     </div>
                     break;
 
                 case Modal.DeleteDeposit:
-                    <h3>Delete deposit?</h3>
-                    <p class="hint">This clears @State.MemberName(_depositMemberId)'s deposit for this period.</p>
+                    <h3>@Loc["Delete deposit?"]</h3>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button class="danger-btn" @onclick="ConfirmDeleteDeposit">Delete</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteDeposit">@Loc["Delete"]</button>
                     </div>
+                    break;
+
+                case Modal.ContribCat:
+                    <h3>@(_contribCatId == Guid.Empty ? Loc["New contribution category"] : Loc["Rename category"])</h3>
+                    <label>@Loc["Name"] <input type="text" @bind="_contribCatName" /></label>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveContribCat" disabled="@(string.IsNullOrWhiteSpace(_contribCatName))">@(_contribCatId == Guid.Empty ? Loc["Add"] : Loc["Save"])</button>
+                    </div>
+                    break;
+
+                case Modal.DeleteContribCat:
+                    <h3>@Loc["Remove category?"]</h3>
+                    @if (State.ContributionCategoryRemovalBlocker(_contribCatId) is { } ccBlocker)
+                    {
+                        <p class="hint">Can’t remove — @ccBlocker.</p>
+                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">@Loc["Close"]</button></div>
+                    }
+                    else
+                    {
+                        <p class="hint">@Loc["This removes the category permanently."]</p>
+                        <div class="modal-actions">
+                            <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                            <button class="danger-btn" @onclick="ConfirmDeleteContribCat">@Loc["Remove"]</button>
+                        </div>
+                    }
                     break;
 
                 case Modal.EditSavingDeposit:
@@ -1007,7 +1070,7 @@ else
 }
 
 @code {
-    private enum Modal { None, AddCat, EditCat, DeleteCat, AddAccount, EditAccount, DeleteAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, EditDeposit, DeleteDeposit, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, TransferOut, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
+    private enum Modal { None, AddCat, EditCat, DeleteCat, AddAccount, EditAccount, DeleteAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, EditDeposit, DeleteDeposit, ContribCat, DeleteContribCat, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, TransferOut, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
     private enum Tab { Account, Budgets, Expenses, Savings }
 
     private Tab _tab = Tab.Account;
@@ -1033,8 +1096,19 @@ else
     private decimal _openingAmount;
     private Guid _moveBalanceToId;
 
-    private Guid _depositMemberId;
-    private decimal _depositAmount;
+    private Guid _depCategoryId;
+    private Guid _depFundId;
+    private decimal _depAmount;
+    private DateOnly _depDate = DateOnly.FromDateTime(DateTime.Today);
+
+    private Guid _editContribId;
+    private Guid _editContribCategoryId;
+    private Guid _editContribFundId;
+    private decimal _editContribAmount;
+    private DateOnly _editContribDate;
+
+    private Guid _contribCatId;
+    private string? _contribCatName;
 
     private Guid _savingDepositId;
     private Guid _savingDepositBucketId;
@@ -1052,11 +1126,6 @@ else
     private Guid _savingMovementId;
     private decimal _savingMovementAmount;
 
-    // Per-member deposit input, keyed by member UserId (each row edits its own amount).
-    private readonly Dictionary<Guid, decimal> _contribAmounts = new();
-
-    private decimal GetContribAmount(Guid id) => _contribAmounts.GetValueOrDefault(id);
-    private void SetContribAmount(Guid id, decimal v) => _contribAmounts[id] = v;
     private Guid _savingBucketId;
     private decimal _savingAmount;
     private bool _copyBudgets = true;
@@ -1129,6 +1198,9 @@ else
         _spendExpBucketId = _savingBucketId;
         _spendExpCategoryId = _categoryId;
         _fundId = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
+        _depCategoryId = State.ContributionCategories.FirstOrDefault()?.Id ?? Guid.Empty;
+        _depFundId = _fundId;
+        _depDate = DateOnly.FromDateTime(DateTime.Today);
         _transferFromId = _fundId;
         _transferToId = State.RootFunds.Skip(1).FirstOrDefault()?.Id ?? _fundId;
     }
@@ -1170,33 +1242,57 @@ else
         _expenseDate = _dayView ?? DateOnly.FromDateTime(DateTime.Today);
     });
 
-    private Task RecordDeposit(Guid memberId) => Run(async () =>
+    private Task RecordDeposit() => Run(async () =>
     {
-        var amount = _contribAmounts.GetValueOrDefault(memberId);
-        if (amount <= 0) return;
-        await State.RecordDeposit(memberId, amount);
-        _contribAmounts[memberId] = 0;
+        if (_depAmount <= 0) return;
+        await State.RecordDeposit(_depCategoryId, _depFundId, _depAmount, _depDate);
+        _depAmount = 0;
     });
 
-    private void OpenEditDeposit(Guid memberId)
+    private void OpenEditDeposit(Guid contributionId)
     {
-        _depositMemberId = memberId;
-        _depositAmount = State.ContributionFor(memberId)?.Paid.Amount ?? 0m;
+        if (State.FindContribution(contributionId) is not { } c) return;
+        _editContribId = contributionId;
+        _editContribCategoryId = c.CategoryId;
+        _editContribFundId = c.FundId == Guid.Empty ? _depFundId : c.FundId;
+        _editContribAmount = c.Paid.Amount;
+        _editContribDate = c.Date == default ? _depDate : c.Date;
         _modal = Modal.EditDeposit;
     }
 
     private Task SaveEditDeposit() => Run(async () =>
     {
-        if (_depositAmount < 0) return;
-        await State.EditDeposit(_depositMemberId, _depositAmount);
+        if (_editContribAmount <= 0) return;
+        await State.EditDeposit(_editContribId, _editContribCategoryId, _editContribFundId, _editContribAmount, _editContribDate);
         CloseModal();
     });
 
-    private void OpenDeleteDeposit(Guid memberId) { _depositMemberId = memberId; _modal = Modal.DeleteDeposit; }
+    private void OpenDeleteDeposit(Guid contributionId) { _editContribId = contributionId; _modal = Modal.DeleteDeposit; }
 
     private Task ConfirmDeleteDeposit() => Run(async () =>
     {
-        await State.RemoveDeposit(_depositMemberId);
+        await State.RemoveDeposit(_editContribId);
+        CloseModal();
+    });
+
+    private void OpenAddContribCat() { _contribCatId = Guid.Empty; _contribCatName = null; _modal = Modal.ContribCat; }
+    private void OpenEditContribCat(Guid id) { _contribCatId = id; _contribCatName = State.ContributionCategoryName(id); _modal = Modal.ContribCat; }
+
+    private Task SaveContribCat() => Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(_contribCatName)) return;
+        if (_contribCatId == Guid.Empty)
+            await State.AddContributionCategory(_contribCatName!);
+        else
+            await State.RenameContributionCategory(_contribCatId, _contribCatName!);
+        CloseModal();
+    });
+
+    private void OpenDeleteContribCat(Guid id) { _contribCatId = id; _modal = Modal.DeleteContribCat; }
+
+    private Task ConfirmDeleteContribCat() => Run(async () =>
+    {
+        await State.RemoveContributionCategory(_contribCatId);
         CloseModal();
     });
 

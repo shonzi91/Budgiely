@@ -132,6 +132,21 @@ public sealed class Localizer(IJSRuntime js)
         ["this period:"] = "този период:",
         ["all periods:"] = "всички периоди:",
 
+        // Contributions
+        ["Categories"] = "Категории",
+        ["Add category"] = "Добави категория",
+        ["Category"] = "Категория",
+        ["Fund"] = "Сметка",
+        ["Date"] = "Дата",
+        ["Rename"] = "Преименувай",
+        ["Edit deposit"] = "Редактирай вноска",
+        ["Delete deposit?"] = "Изтриване на вноска?",
+        ["New contribution category"] = "Нова категория вноски",
+        ["Rename category"] = "Преименувай категория",
+        ["Name"] = "Име",
+        ["Remove category?"] = "Премахване на категория?",
+        ["This removes the category permanently."] = "Това премахва категорията завинаги.",
+
         // Modal action buttons
         ["Cancel"] = "Отказ",
         ["Save"] = "Запази",

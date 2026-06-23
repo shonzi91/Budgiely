@@ -207,6 +207,13 @@ button.link { background: none; border: none; color: #4f46e5; font-weight: 600; 
 }
 .carry-form { grid-template-columns: 1fr 1fr 1fr 1.4fr auto; }
 
+/* Contribution categories */
+.contrib-cats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 4px; }
+.cat-chip {
+    background: #f1f3f6; border-radius: 999px; padding: 3px 6px 3px 12px;
+    font-size: .82rem; display: inline-flex; align-items: center; gap: 1px;
+}
+
 /* Expenses day view + date separators */
 .day-nav { display: flex; align-items: center; gap: 6px; }
 .day-nav input[type=date] { padding: 5px 8px; border: 1px solid #d8dce3; border-radius: 8px; font-size: .82rem; }

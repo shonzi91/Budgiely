@@ -47,8 +47,16 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             OwnedList(a, x => x.Members);
             OwnedList(a, x => x.Categories);
             OwnedList(a, x => x.SavingCategories);
+            OwnedList(a, x => x.ContributionCategories);
             OwnedList(a, x => x.Funds);
             OwnedList(a, x => x.Periods);
+        });
+
+        b.Entity<ContributionCategory>(c =>
+        {
+            c.ToTable("ContributionCategories");
+            Key(c);
+            c.Property(x => x.Name).IsRequired();
         });
 
         b.Entity<Fund>(f =>
@@ -193,6 +201,9 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             c.ToTable("Contributions");
             Key(c);
             c.Property(x => x.MemberId);
+            c.Property(x => x.CategoryId);
+            c.Property(x => x.FundId);
+            c.Property(x => x.Date);
             c.Property(x => x.Paid).HasConversion(money).IsRequired();
         });
 
