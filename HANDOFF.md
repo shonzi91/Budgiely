@@ -26,11 +26,15 @@ europe-west1; free **Neon Postgres**, eu-central-1). Redeploy: `gcloud run deplo
   view. #5 **collapsible** expense list under each budget category (`BudgetTreeNode._expanded`). #6 Savings-tab **"Spend as
   expense"** panel (reuses `BudgetingState.SpendFromSavings`).
 
-## NEXT — #1 + #2 (designed, NOT yet built; deposits reshape) — START HERE
-Two requested features that reshape contributions. **Key de-risk: the server stores the account body as an OPAQUE JSON
-snapshot (`AccountSnapshotRow.Payload`) — it never persists Periods/Contributions relationally — so NO Postgres
-migration/reset is needed.** Only the **MAUI SQLite** client uses the full relational map → needs one `dotnet ef` migration.
-The snapshot serializer must round-trip new fields with backward-compatible defaults for old payloads.
+## #1 + #2 — DONE (2026-06-22, live as revision finapp-00007); 101 tests pass
+Contributions reshape — built & deployed. (Server stores the body as opaque JSON, so no Postgres migration was needed;
+SQLite migration `AddContributionCategoriesAndFundAttribution` added for MAUI. Serializer round-trips new fields with
+back-compat defaults.) **Implemented:** `ContributionCategory` (account-level, Add/Rename/Remove, dup guard, remove blocked
+when referenced; new accounts seed Salary+Other); `Contribution` itemized `(MemberId, CategoryId, FundId, Date, Paid)`,
+deposits merge by (member,category,fund); `Period.Deposit/EditContribution/RemoveContribution` (by id); `FundBalance`
+includes attributed deposits (fund balances now sum to expected closing); own-only edit (`CanHandleContribution`).
+Contributions UI = deposit form (category+fund+amount+date) + category chips + itemized own-editable list.
+Original design notes (kept for reference):
 - **#1 Contribution categories per account** (e.g. Salary/Rent/Insurance/Vouchers): new account-level `ContributionCategory`
   entity + Account Add/Rename/Remove (dup-name check via `NameEquals`; block remove if in use). The "From previous period"
   leftover is NOT a contribution (it's `Period.CarriedIn`) — it keeps its own pseudo-category, unaffected.
