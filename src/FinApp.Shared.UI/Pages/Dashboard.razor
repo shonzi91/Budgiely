@@ -59,7 +59,7 @@ else
                     }
                 </div>
                 <div class="period-row">
-                    <span class="period">@State.Period.From.ToString("dd MMM") – @State.Period.To.ToString("dd MMM yyyy") · period @State.PeriodNumber/@State.PeriodCount</span>
+                    <span class="period">@State.Period.From.ToString("dd MMM") – @State.Period.To.ToString("dd MMM yyyy") (@State.PeriodNumber/@State.PeriodCount)</span>
                     <span class="period-ops">
                         <button class="exp-edit" title="Edit period dates" @onclick="OpenEditPeriod">📅</button>
                         @if (State.IsLatestPeriod && State.PeriodCount > 1)
