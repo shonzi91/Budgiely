@@ -1,6 +1,7 @@
 @page "/"
 @implements IDisposable
 @inject BudgetingState State
+@inject Localizer Loc
 
 @if (_busy)
 {
@@ -14,19 +15,19 @@
 else if (!State.HasAccounts)
 {
     <div class="firstrun">
-        <h1>Welcome to FinApp</h1>
+        <h1>@Loc["Welcome to FinApp"]</h1>
         <InvitationsPanel />
-        <p>Create your first account to get started (e.g. Personal, Shared, Family).</p>
+        <p>@Loc["Create your first account to get started (e.g. Personal, Shared, Family)."]</p>
         @if (_error is not null)
         {
-            <div class="alert warn-bg"><span>@_error</span><button class="alert-x" title="Dismiss" @onclick="() => _error = null">×</button></div>
+            <div class="alert warn-bg"><span>@_error</span><button class="alert-x" title="@Loc["Dismiss"]" @onclick="() => _error = null">×</button></div>
         }
         <div class="firstrun-form">
-            <label>Account name <input type="text" placeholder="Personal" @bind="_fName" /></label>
-            <label>Currency <input type="text" maxlength="3" @bind="_fCurrency" /></label>
-            <button @onclick="CreateFirstAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">Create account</button>
+            <label>@Loc["Account name"] <input type="text" placeholder="Personal" @bind="_fName" /></label>
+            <label>@Loc["Currency"] <input type="text" maxlength="3" @bind="_fCurrency" /></label>
+            <button @onclick="CreateFirstAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Create account"]</button>
         </div>
-        <small class="hint">It starts with a few starter categories and the current month’s period — you can change everything.</small>
+        <small class="hint">@Loc["It starts with a few starter categories and the current month’s period — you can change everything."]</small>
     </div>
 }
 else
@@ -76,10 +77,10 @@ else
             <button class="nav" title="Next period" @onclick="State.GoNext" disabled="@(!State.CanGoNext)">▶</button>
         </div>
         <div class="head-right">
-            <span class="status">@State.Period.Status</span>
+            <span class="status">@Loc[State.Period.Status.ToString()]</span>
             <div class="balances">
-                <span class="bal" title="Sum of the period's opening fund values"><span class="bal-label">Opening</span> <strong>@Fmt(State.OpeningBalance)</strong></span>
-                <span class="bal" title="Money expected to carry into the next period"><span class="bal-label">Closing</span> <strong>@Fmt(State.ClosingBalance)</strong></span>
+                <span class="bal" title="Sum of the period's opening fund values"><span class="bal-label">@Loc["Opening"]</span> <strong>@Fmt(State.OpeningBalance)</strong></span>
+                <span class="bal" title="Money expected to carry into the next period"><span class="bal-label">@Loc["Closing"]</span> <strong>@Fmt(State.ClosingBalance)</strong></span>
             </div>
         </div>
     </header>
@@ -88,27 +89,27 @@ else
 
     @if (_error is not null)
     {
-        <div class="alert warn-bg"><strong>Couldn’t do that.</strong> <span>@_error</span><button class="alert-x" title="Dismiss" @onclick="() => _error = null">×</button></div>
+        <div class="alert warn-bg"><strong>@Loc["Couldn’t do that."]</strong> <span>@_error</span><button class="alert-x" title="@Loc["Dismiss"]" @onclick="() => _error = null">×</button></div>
     }
 
     <nav class="tabs">
-        <button class="tab @(_tab == Tab.Account ? "active" : "")" @onclick="() => _tab = Tab.Account">Account</button>
-        <button class="tab @(_tab == Tab.Budgets ? "active" : "")" @onclick="() => _tab = Tab.Budgets">Budgets</button>
-        <button class="tab @(_tab == Tab.Expenses ? "active" : "")" @onclick="() => _tab = Tab.Expenses">Expenses</button>
-        <button class="tab @(_tab == Tab.Savings ? "active" : "")" @onclick="() => _tab = Tab.Savings">Savings</button>
+        <button class="tab @(_tab == Tab.Account ? "active" : "")" @onclick="() => _tab = Tab.Account">@Loc["Account"]</button>
+        <button class="tab @(_tab == Tab.Budgets ? "active" : "")" @onclick="() => _tab = Tab.Budgets">@Loc["Budgets"]</button>
+        <button class="tab @(_tab == Tab.Expenses ? "active" : "")" @onclick="() => _tab = Tab.Expenses">@Loc["Expenses"]</button>
+        <button class="tab @(_tab == Tab.Savings ? "active" : "")" @onclick="() => _tab = Tab.Savings">@Loc["Savings"]</button>
     </nav>
 
     @switch (_tab)
     {
         case Tab.Account:
             <section class="cards">
-                <div class="card"><span class="card-label">Contributed</span><span class="card-value">@Fmt(State.TotalContributed)</span></div>
-                <div class="card"><span class="card-label">Spent</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
-                <div class="card"><span class="card-label">Budgeted</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
+                <div class="card"><span class="card-label">@Loc["Contributed"]</span><span class="card-value">@Fmt(State.TotalContributed)</span></div>
+                <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
+                <div class="card"><span class="card-label">@Loc["Budgeted"]</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
                 <div class="card savings">
-                    <span class="card-label">Saved this period</span>
+                    <span class="card-label">@Loc["Saved this period"]</span>
                     <span class="card-value">@Fmt(State.SavingsThisPeriod)</span>
-                    <span class="card-sub">@PctOrDash(State.PeriodSavingsRate) of contributions</span>
+                    <span class="card-sub">@PctOrDash(State.PeriodSavingsRate) @Loc["of contributions"]</span>
                 </div>
             </section>
 
@@ -122,7 +123,7 @@ else
 
             <section class="panel">
                 <div class="panel-head">
-                    <h2>Funds</h2>
+                    <h2>@Loc["Funds"]</h2>
                     <span class="head-actions">
                         @if (State.IsPeriodOpen && State.TransferableAccounts.Any() && State.RootFunds.Any())
                         {
@@ -161,7 +162,7 @@ else
                     }
                     @if (!State.RootFunds.Any())
                     {
-                        <li><em>No funds yet — add one.</em></li>
+                        <li><em>@Loc["No funds yet — add one."]</em></li>
                     }
                 </ul>
                 @if (State.RootFunds.Count > 1 && State.IsPeriodOpen)
@@ -180,7 +181,7 @@ else
                                 <option value="@f.Id">@f.Name</option>
                             }
                         </select>
-                        <input type="number" step="0.01" min="0" placeholder="Amount" @bind="_transferAmount" />
+                        <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_transferAmount" />
                         <button title="Transfer between funds" @onclick="Transfer" disabled="@(_transferAmount <= 0 || _transferFromId == _transferToId)">🔁</button>
                     </div>
                     <small class="hint">Move money between funds — the period total is unchanged, only where the money sits.</small>
@@ -225,12 +226,12 @@ else
             </section>
 
             <section class="panel">
-                <h2>Contributions</h2>
+                <h2>@Loc["Contributions"]</h2>
                 @if (State.CarryoverThisPeriod.Amount != 0)
                 {
                     <ul class="list">
                         <li class="contrib">
-                            <span class="contrib-name">From previous period</span>
+                            <span class="contrib-name">@Loc["From previous period"]</span>
                             <span class="contrib-state">
                                 @if (State.CarryoverThisPeriod.Amount < 0)
                                 {
@@ -261,11 +262,11 @@ else
                             <span class="contrib-state">
                                 @if (c is null || c.Paid.IsZero)
                                 {
-                                    <em>no deposits yet</em>
+                                    <em>@Loc["no deposits yet"]</em>
                                 }
                                 else
                                 {
-                                    <span>@Fmt(c.Paid) deposited</span>
+                                    <span>@Fmt(c.Paid) @Loc["deposited"]</span>
                                     @if (State.IsPeriodOpen)
                                     {
                                         <button class="exp-edit" title="Edit deposit" @onclick="() => OpenEditDeposit(m.UserId)">✏️</button>
@@ -274,20 +275,20 @@ else
                                 }
                             </span>
                             <span class="contrib-actions">
-                                <input type="number" step="0.01" min="0" placeholder="Amount" @bind:get="GetContribAmount(m.UserId)" @bind:set="v => SetContribAmount(m.UserId, v)" />
-                                <button class="ghost" @onclick="() => RecordDeposit(m.UserId)" disabled="@State.HasUnallocatedFunds" title="@(State.HasUnallocatedFunds ? "Allocate existing funds first" : null)">Deposit</button>
+                                <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind:get="GetContribAmount(m.UserId)" @bind:set="v => SetContribAmount(m.UserId, v)" />
+                                <button class="ghost" @onclick="() => RecordDeposit(m.UserId)" disabled="@State.HasUnallocatedFunds" title="@(State.HasUnallocatedFunds ? "Allocate existing funds first" : null)">@Loc["Deposit"]</button>
                             </span>
                         </li>
                     }
                     @if (!State.Members.Any())
                     {
-                        <li><em>No members in this account yet.</em></li>
+                        <li><em>@Loc["No members in this account yet."]</em></li>
                     }
                 </ul>
             </section>
 
             <section class="panel">
-                <h2>Recent expenses</h2>
+                <h2>@Loc["Recent expenses"]</h2>
                 <ul class="list">
                     @foreach (var e in State.RecentExpenses)
                     {
@@ -305,7 +306,7 @@ else
                     }
                     @if (!State.RecentExpenses.Any())
                     {
-                        <li><em>No expenses yet.</em></li>
+                        <li><em>@Loc["No expenses yet."]</em></li>
                     }
                 </ul>
             </section>
@@ -314,7 +315,7 @@ else
         case Tab.Budgets:
             <section class="panel">
                 <div class="panel-head">
-                    <h2>Budgets</h2>
+                    <h2>@Loc["Budgets"]</h2>
                     <span>
                         <button class="link" title="Add a top-level category" @onclick="() => OpenAdd(null)">➕</button>
                     </span>
@@ -331,7 +332,7 @@ else
 
         case Tab.Expenses:
             <section class="panel">
-                <h2>Add expense</h2>
+                <h2>@Loc["Add expense"]</h2>
                 <div class="form">
                     <select @bind="_categoryId">
                         @foreach (var (cat, depth) in State.CategoryOptions)
@@ -339,7 +340,7 @@ else
                             <option value="@cat.Id">@IndentLabel(cat.Name, depth)</option>
                         }
                     </select>
-                    <input type="number" step="0.01" min="0" placeholder="Amount" @bind="_amount" />
+                    <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_amount" />
                     <input type="date" @bind="_expenseDate" />
                     <select @bind="_fundId">
                         @foreach (var f in State.RootFunds)
@@ -347,13 +348,13 @@ else
                             <option value="@f.Id">@f.Name</option>
                         }
                     </select>
-                    <input type="text" placeholder="Note (optional)" @bind="_note" />
+                    <input type="text" placeholder="@Loc["Note (optional)"]" @bind="_note" />
                     <button title="Add expense" @onclick="AddExpense" disabled="@(_amount <= 0)">➕</button>
                 </div>
             </section>
 
             <section class="panel">
-                <h2>All expenses</h2>
+                <h2>@Loc["All expenses"]</h2>
                 <ul class="list">
                     @foreach (var e in State.AllExpenses)
                     {
@@ -371,7 +372,7 @@ else
                     }
                     @if (!State.AllExpenses.Any())
                     {
-                        <li><em>No expenses yet.</em></li>
+                        <li><em>@Loc["No expenses yet."]</em></li>
                     }
                 </ul>
             </section>
@@ -380,13 +381,13 @@ else
         case Tab.Savings:
             <section class="panel">
                 <div class="panel-head">
-                    <h2>Savings buckets</h2>
+                    <h2>@Loc["Savings buckets"]</h2>
                     <button class="link" title="Add a savings bucket" @onclick="OpenAddBucket">➕</button>
                 </div>
                 <p class="hint">
-                    <strong>Total saved: @Fmt(State.SavingsAccumulated)</strong> ·
-                    this period: <strong>@PctOrDash(State.PeriodSavingsRate)</strong> of contributions ·
-                    all periods: <strong>@PctOrDash(State.AccountSavingsRate)</strong>
+                    <strong>@Loc["Total saved:"] @Fmt(State.SavingsAccumulated)</strong> ·
+                    @Loc["this period:"] <strong>@PctOrDash(State.PeriodSavingsRate)</strong> @Loc["of contributions"] ·
+                    @Loc["all periods:"] <strong>@PctOrDash(State.AccountSavingsRate)</strong>
                 </p>
                 <ul class="bucket-list">
                     @foreach (var (bucket, total) in State.SavingBuckets)
@@ -414,7 +415,7 @@ else
                     }
                     @if (!State.SavingBuckets.Any())
                     {
-                        <li><em>No buckets yet — add one to start saving.</em></li>
+                        <li><em>@Loc["No buckets yet — add one to start saving."]</em></li>
                     }
                 </ul>
             </section>
@@ -422,7 +423,7 @@ else
             @if (State.SavingBuckets.Any())
             {
                 <section class="panel">
-                    <h2>Add to savings</h2>
+                    <h2>@Loc["Add to savings"]</h2>
                     <div class="form savings-form">
                         <select @bind="_savingBucketId">
                             @foreach (var (bucket, _) in State.SavingBuckets)
@@ -430,7 +431,7 @@ else
                                 <option value="@bucket.Id">@bucket.Name</option>
                             }
                         </select>
-                        <input type="number" step="0.01" min="0" placeholder="Amount" @bind="_savingAmount" />
+                        <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_savingAmount" />
                         <button title="Add to savings" @onclick="AllocateSaving" disabled="@(_savingAmount <= 0 || _savingAmount > State.MaxAdditionalSavings.Amount)">💰</button>
                     </div>
                     <small class="hint">Available to save: <strong>@Fmt(State.MaxAdditionalSavings)</strong> (contributed − budgeted).</small>
@@ -456,7 +457,7 @@ else
                 </section>
 
                 <section class="panel">
-                    <h2>Spend savings</h2>
+                    <h2>@Loc["Spend savings"]</h2>
                     <div class="form spend-form">
                         <select @bind="_spendBucketId">
                             @foreach (var (bucket, _) in State.SavingBuckets)
@@ -491,7 +492,7 @@ else
                                 </optgroup>
                             }
                         </select>
-                        <input type="number" step="0.01" min="0" placeholder="Amount" @bind="_spendAmount" />
+                        <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_spendAmount" />
                         <button title="Move savings" @onclick="MoveSaving" disabled="@(_spendAmount <= 0 || _spendDestId == Guid.Empty || _spendDestId == _spendBucketId)">➡️</button>
                     </div>
                     <small class="hint">Pick a destination: a <strong>budget</strong> matures the saving into this month's plan for that category; another <strong>bucket</strong> shifts it across (totals unchanged). The source bucket drops by the amount either way.</small>
@@ -1043,11 +1044,13 @@ else
     protected override async Task OnInitializedAsync()
     {
         State.Changed += OnChanged;
+        Loc.Changed += OnLocChanged;
         await State.InitializeAsync();
         ResetPickers();
     }
 
     private void OnChanged() { ResetPickers(); InvokeAsync(StateHasChanged); }
+    private void OnLocChanged() => InvokeAsync(StateHasChanged);
 
     private void ResetPickers()
     {
@@ -1513,5 +1516,5 @@ else
     private static string PctOrDash(decimal? ratio) =>
         ratio is { } r ? $"{decimal.Round(r * 100m, 0, MidpointRounding.AwayFromZero)}%" : "—";
 
-    public void Dispose() => State.Changed -= OnChanged;
+    public void Dispose() { State.Changed -= OnChanged; Loc.Changed -= OnLocChanged; }
 }

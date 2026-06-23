@@ -13,6 +13,29 @@
     color: #1f2430;
 }
 
+.auth-lang {
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+    margin: -8px -8px -2px 0;
+}
+
+.auth-lang .flag {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 8px;
+    opacity: .45;
+    filter: grayscale(.6);
+    transition: opacity .12s, filter .12s, background .12s;
+}
+
+.auth-lang .flag:hover { opacity: .85; filter: grayscale(0); }
+.auth-lang .flag.active { opacity: 1; filter: grayscale(0); background: #eef0fb; }
+
 .auth h1 {
     margin: 0;
     text-align: center;

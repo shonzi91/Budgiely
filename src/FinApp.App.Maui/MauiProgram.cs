@@ -23,6 +23,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton(_ => new HttpClient { BaseAddress = new Uri(serverUrl) });
 		builder.Services.AddSingleton<FinAppApiClient>();
 		builder.Services.AddSingleton<ITokenStore, MauiTokenStore>();
+		builder.Services.AddSingleton<Localizer>();
 		builder.Services.AddSingleton<AuthState>();
 		builder.Services.AddSingleton<SyncClient>();
 		builder.Services.AddSingleton<BudgetingState>();

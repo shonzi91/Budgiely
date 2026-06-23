@@ -18,6 +18,7 @@ builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBaseUr
 builder.Services.AddSingleton(new ClientOptions { BaseUrl = apiBaseUrl });
 builder.Services.AddScoped<FinAppApiClient>();
 builder.Services.AddScoped<ITokenStore, WebTokenStore>();
+builder.Services.AddScoped<Localizer>();
 builder.Services.AddScoped<AuthState>();
 builder.Services.AddScoped<SyncClient>();
 builder.Services.AddScoped<BudgetingState>();

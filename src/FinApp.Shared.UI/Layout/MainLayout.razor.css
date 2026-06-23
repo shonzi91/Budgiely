@@ -28,6 +28,15 @@
     gap: 12px;
 }
 
+.lang { display: flex; gap: 2px; }
+.flag {
+    background: none; border: none; cursor: pointer; font-size: 1.05rem; line-height: 1;
+    padding: 4px 5px; border-radius: 7px; opacity: .5; filter: grayscale(.6);
+    transition: opacity .12s, filter .12s, background .12s;
+}
+.flag:hover { opacity: .85; filter: grayscale(0); }
+.flag.active { opacity: 1; filter: grayscale(0); background: rgba(255, 255, 255, .2); }
+
 .appbar-user .user { font-size: .9rem; opacity: .95; }
 
 .appbar-user .link {

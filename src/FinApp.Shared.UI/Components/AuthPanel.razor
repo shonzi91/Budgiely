@@ -1,12 +1,18 @@
 @inject AuthState Auth
+@inject Localizer Loc
+@implements IDisposable
 
 <div class="auth">
+    <div class="auth-lang">
+        <button class="flag @(Loc.Culture == "en" ? "active" : "")" title="English" @onclick='() => Loc.SetCultureAsync("en")'>🇬🇧</button>
+        <button class="flag @(Loc.Culture == "bg" ? "active" : "")" title="Български" @onclick='() => Loc.SetCultureAsync("bg")'>🇧🇬</button>
+    </div>
     <h1>FinApp</h1>
-    <p class="hint">Private, shared budgeting. Sign in or create an account to begin.</p>
+    <p class="hint">@Loc["Private, shared budgeting. Sign in or create an account to begin."]</p>
 
     <div class="auth-tabs">
-        <button class="tab @(_mode == Mode.Login ? "active" : "")" @onclick="() => Switch(Mode.Login)">Sign in</button>
-        <button class="tab @(_mode == Mode.Register ? "active" : "")" @onclick="() => Switch(Mode.Register)">Create account</button>
+        <button class="tab @(_mode == Mode.Login ? "active" : "")" @onclick="() => Switch(Mode.Login)">@Loc["Sign in"]</button>
+        <button class="tab @(_mode == Mode.Register ? "active" : "")" @onclick="() => Switch(Mode.Register)">@Loc["Create account"]</button>
     </div>
 
     @if (_error is not null)
@@ -16,21 +22,21 @@
 
     @if (_mode == Mode.Login)
     {
-        <label>Username or email <input type="text" placeholder="you@example.com or username" autocomplete="username" @bind="_identifier" @bind:event="oninput" /></label>
-        <label>Password <input type="password" placeholder="Your password" autocomplete="current-password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
+        <label>@Loc["Username or email"] <input type="text" placeholder="@Loc["you@example.com or username"]" autocomplete="username" @bind="_identifier" @bind:event="oninput" /></label>
+        <label>@Loc["Password"] <input type="password" placeholder="@Loc["Your password"]" autocomplete="current-password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
         <button class="primary" @onclick="SignIn" disabled="@(_busy || string.IsNullOrWhiteSpace(_identifier) || string.IsNullOrEmpty(_password))">
-            @(_busy ? "Signing in…" : "Sign in")
+            @(_busy ? Loc["Signing in…"] : Loc["Sign in"])
         </button>
     }
     else
     {
-        <label>Username <input type="text" placeholder="Pick a username" autocomplete="username" @bind="_username" @bind:event="oninput" /></label>
-        <label>Email <input type="email" placeholder="you@example.com" autocomplete="email" @bind="_email" @bind:event="oninput" /></label>
-        <label>Password <input type="password" placeholder="At least 8 characters" autocomplete="new-password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
+        <label>@Loc["Username"] <input type="text" placeholder="@Loc["Pick a username"]" autocomplete="username" @bind="_username" @bind:event="oninput" /></label>
+        <label>@Loc["Email"] <input type="email" placeholder="you@example.com" autocomplete="email" @bind="_email" @bind:event="oninput" /></label>
+        <label>@Loc["Password"] <input type="password" placeholder="@Loc["At least 8 characters"]" autocomplete="new-password" @bind="_password" @bind:event="oninput" @onkeydown="OnKey" /></label>
         <button class="primary" @onclick="Register" disabled="@(_busy || !CanRegister)">
-            @(_busy ? "Creating…" : "Create account")
+            @(_busy ? Loc["Creating…"] : Loc["Create account"])
         </button>
-        <small class="hint">Password must be at least 8 characters.</small>
+        <small class="hint">@Loc["Password must be at least 8 characters."]</small>
     }
 </div>
 
@@ -43,6 +49,10 @@
 
     private bool CanRegister =>
         !string.IsNullOrWhiteSpace(_username) && !string.IsNullOrWhiteSpace(_email) && _password.Length >= 8;
+
+    protected override void OnInitialized() => Loc.Changed += OnLocChanged;
+    private void OnLocChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Loc.Changed -= OnLocChanged;
 
     private void Switch(Mode mode) { _mode = mode; _error = null; }
 

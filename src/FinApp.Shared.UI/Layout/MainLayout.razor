@@ -2,22 +2,27 @@
 @implements IDisposable
 @inject AuthState Auth
 @inject BudgetingState State
+@inject Localizer Loc
 
 <div class="app-shell">
-    <header class="app-bar">
-        <span class="brand">FinApp</span>
-        @if (Auth.IsAuthenticated)
-        {
+    @if (Auth.IsAuthenticated)
+    {
+        <header class="app-bar">
+            <span class="brand">FinApp</span>
             <span class="appbar-user">
-                <span class="user">Hello, @Auth.CurrentUser!.Username</span>
-                <button class="link" @onclick="SignOut">Sign out</button>
+                <span class="lang">
+                    <button class="flag @(Loc.Culture == "en" ? "active" : "")" title="English" @onclick='() => SetLang("en")'>🇬🇧</button>
+                    <button class="flag @(Loc.Culture == "bg" ? "active" : "")" title="Български" @onclick='() => SetLang("bg")'>🇧🇬</button>
+                </span>
+                <span class="user">@Loc["Hello,"] @Auth.CurrentUser!.Username</span>
+                <button class="link" @onclick="SignOut">@Loc["Sign out"]</button>
             </span>
-        }
-    </header>
+        </header>
+    }
     <main class="app-body">
         @if (!_restored)
         {
-            <p class="loading">Loading…</p>
+            <p class="loading">@Loc["Loading…"]</p>
         }
         else if (!Auth.IsAuthenticated)
         {
@@ -35,13 +40,17 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Auth.Changed += OnAuthChanged;
+        Auth.Changed += OnChanged;
+        Loc.Changed += OnChanged;
+        await Loc.InitializeAsync();
         try { await Auth.TryRestoreAsync(); }
         catch { /* server unreachable on startup — fall through to the sign-in screen */ }
         _restored = true;
     }
 
-    private void OnAuthChanged() => InvokeAsync(StateHasChanged);
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task SetLang(string culture) => await Loc.SetCultureAsync(culture);
 
     private async Task SignOut()
     {
@@ -49,5 +58,9 @@
         await Auth.SignOutAsync();
     }
 
-    public void Dispose() => Auth.Changed -= OnAuthChanged;
+    public void Dispose()
+    {
+        Auth.Changed -= OnChanged;
+        Loc.Changed -= OnChanged;
+    }
 }
