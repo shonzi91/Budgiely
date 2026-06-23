@@ -297,7 +297,15 @@ unverified locally — but one-origin hosting was verified by running the server
   SQLite still uses `Migrate()`. Model was already provider-agnostic (Money→text, all `DateTimeOffset` are UtcNow). 98 tests
   still green. **Chosen deploy: Google Cloud Run + free Neon Postgres** (`deploy/cloudrun/README.md`) — managed, auto-HTTPS,
   scale-to-zero, `gcloud run deploy --source .` builds via Cloud Build (no local Docker). Must run `--max-instances 1`
-  (SignalR has no backplane). **Not yet deployed** — user was about to run the Cloud Run steps.
+  (SignalR has no backplane). **DEPLOYED & LIVE (2026-06-22):** https://finapp-85638328674.europe-west1.run.app
+  (GCP project `finapp-1111`, region europe-west1, Neon Postgres eu-central-1). Verified: `/`→200 WASM shell, `/accounts`→401,
+  startup `EnsureCreated()` succeeded against Neon (proves DB connectivity).
+  - **Gotcha fixed during deploy:** Neon hands out a `postgres://` URI, but Npgsql only parses key-value strings → startup
+    crash. `Program.cs` now normalizes a `postgres://`/`postgresql://` URI to `NpgsqlConnectionStringBuilder` form.
+  - **SECURITY TODO:** the Neon DB password was surfaced in a Cloud Run log read during debugging (so it's in that session
+    transcript). Rotate it in the Neon dashboard and redeploy with the new `ConnectionStrings__FinApp`.
+  - Redeploy/update: `gcloud run deploy finapp --source . --region europe-west1` (reuses env vars). Secrets currently passed
+    as env vars; move to Secret Manager for hardening.
 
 ## Next sessions roadmap (planned 2026-06-19) — confirm scope/order with the user before starting
 
