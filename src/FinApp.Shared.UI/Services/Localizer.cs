@@ -110,7 +110,13 @@ public sealed class Localizer(IJSRuntime js)
         ["Savings buckets"] = "Спестовни каси",
         ["Add to savings"] = "Добави към спестявания",
         ["Spend savings"] = "Изразходвай спестявания",
+        ["Spend as expense"] = "Похарчи като разход",
+        ["Records a real expense paid straight from this bucket (dated today)."] =
+            "Записва реален разход, платен директно от тази каса (с днешна дата).",
         ["From previous period"] = "От предишен период",
+        ["Previous day"] = "Предишен ден",
+        ["Next day"] = "Следващ ден",
+        ["All days"] = "Всички дни",
 
         // Common inline labels / empty states
         ["Amount"] = "Сума",

@@ -207,6 +207,17 @@ button.link { background: none; border: none; color: #4f46e5; font-weight: 600; 
 }
 .carry-form { grid-template-columns: 1fr 1fr 1fr 1.4fr auto; }
 
+/* Expenses day view + date separators */
+.day-nav { display: flex; align-items: center; gap: 6px; }
+.day-nav input[type=date] { padding: 5px 8px; border: 1px solid #d8dce3; border-radius: 8px; font-size: .82rem; }
+.date-sep {
+    display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+    color: #4f46e5; font-weight: 700; font-size: .82rem; padding: 14px 4px 4px;
+    border-bottom: 1px solid #f1f3f6;
+}
+.date-sep:first-child { padding-top: 4px; }
+.date-sep:hover { color: #4338ca; text-decoration: underline; }
+
 /* Modals */
 .modal-backdrop {
     position: fixed; inset: 0; background: rgba(17,20,28,.45);

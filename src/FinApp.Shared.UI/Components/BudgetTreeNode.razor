@@ -32,6 +32,12 @@
 }
 @if (expenses.Count > 0)
 {
+    <button class="exp-toggle" style="margin-left:@(16 + Depth * 20)px" @onclick="() => _expanded = !_expanded">
+        @(_expanded ? "▾" : "▸") @expenses.Count @(expenses.Count == 1 ? "expense" : "expenses")
+    </button>
+}
+@if (expenses.Count > 0 && _expanded)
+{
     <ul class="tree-expenses" style="padding-left:@(16 + Depth * 20)px">
         @foreach (var e in expenses)
         {
@@ -64,6 +70,8 @@
     [Parameter] public EventCallback<Guid> OnAddExpense { get; set; }
     [Parameter] public EventCallback<Guid> OnEditExpense { get; set; }
     [Parameter] public EventCallback<Guid> OnDeleteExpense { get; set; }
+
+    private bool _expanded;
 
     private string Fmt(Money m)
     {

@@ -332,7 +332,18 @@ else
 
         case Tab.Expenses:
             <section class="panel">
-                <h2>@Loc["Add expense"]</h2>
+                <div class="panel-head">
+                    <h2>@Loc["Add expense"]</h2>
+                    @if (_dayView is { } dv)
+                    {
+                        <span class="day-nav">
+                            <button class="exp-edit" title="@Loc["Previous day"]" @onclick="PrevDay" disabled="@(dv <= State.Period.From)">◀</button>
+                            <input type="date" @bind:get="dv" @bind:set="GoToDay" min="@State.Period.From.ToString("yyyy-MM-dd")" max="@State.Period.To.ToString("yyyy-MM-dd")" />
+                            <button class="exp-edit" title="@Loc["Next day"]" @onclick="NextDay" disabled="@(dv >= State.Period.To)">▶</button>
+                            <button class="link" @onclick="() => _dayView = null">@Loc["All days"]</button>
+                        </span>
+                    }
+                </div>
                 <div class="form">
                     <select @bind="_categoryId">
                         @foreach (var (cat, depth) in State.CategoryOptions)
@@ -341,7 +352,10 @@ else
                         }
                     </select>
                     <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_amount" />
-                    <input type="date" @bind="_expenseDate" />
+                    @if (_dayView is null)
+                    {
+                        <input type="date" @bind="_expenseDate" min="@State.Period.From.ToString("yyyy-MM-dd")" max="@State.Period.To.ToString("yyyy-MM-dd")" />
+                    }
                     <select @bind="_fundId">
                         @foreach (var f in State.RootFunds)
                         {
@@ -349,17 +363,16 @@ else
                         }
                     </select>
                     <input type="text" placeholder="@Loc["Note (optional)"]" @bind="_note" />
-                    <button title="Add expense" @onclick="AddExpense" disabled="@(_amount <= 0)">➕</button>
+                    <button title="@Loc["Add expense"]" @onclick="AddExpense" disabled="@(_amount <= 0)">➕</button>
                 </div>
             </section>
 
             <section class="panel">
-                <h2>@Loc["All expenses"]</h2>
-                <ul class="list">
-                    @foreach (var e in State.AllExpenses)
-                    {
-                        <li>
-                            <span>@e.Date.ToString("dd MMM yyyy") · @State.CategoryName(e.CategoryId)@(e.IsFromSavings ? " · 💰saving" : "")@(string.IsNullOrEmpty(e.Note) ? "" : $" · {e.Note}")</span>
+                <h2>@(_dayView is { } dh ? dh.ToString("dd MMM yyyy") : Loc["All expenses"])</h2>
+                @{
+                    RenderFragment<FinApp.Domain.Budgeting.Expense> row = e =>
+                        @<li>
+                            <span>@State.CategoryName(e.CategoryId)@(e.IsFromSavings ? " · 💰saving" : "")@(string.IsNullOrEmpty(e.Note) ? "" : $" · {e.Note}")</span>
                             <span class="row-actions">
                                 <span class="amt">@Fmt(e.Amount)</span>
                                 @if (State.IsPeriodOpen)
@@ -368,13 +381,27 @@ else
                                     <button class="exp-edit" title="Remove expense" @onclick="() => OpenDeleteExpense(e.Id)">🗑️</button>
                                 }
                             </span>
-                        </li>
-                    }
-                    @if (!State.AllExpenses.Any())
+                        </li>;
+                    var shown = _dayView is { } dvf
+                        ? State.AllExpenses.Where(e => e.Date == dvf).ToList()
+                        : State.AllExpenses.ToList();
+                }
+                @if (!shown.Any())
+                {
+                    <ul class="list"><li><em>@Loc["No expenses yet."]</em></li></ul>
+                }
+                else if (_dayView is not null)
+                {
+                    <ul class="list">@foreach (var e in shown) { @row(e) }</ul>
+                }
+                else
+                {
+                    @foreach (var grp in shown.GroupBy(e => e.Date).OrderByDescending(g => g.Key))
                     {
-                        <li><em>@Loc["No expenses yet."]</em></li>
+                        <button class="date-sep" @onclick="() => GoToDay(grp.Key)">@grp.Key.ToString("dddd, dd MMM yyyy")</button>
+                        <ul class="list">@foreach (var e in grp) { @row(e) }</ul>
                     }
-                </ul>
+                }
             </section>
             break;
 
@@ -515,6 +542,28 @@ else
                             }
                         </ul>
                     }
+                </section>
+
+                <section class="panel">
+                    <h2>@Loc["Spend as expense"]</h2>
+                    <div class="form spend-form">
+                        <select @bind="_spendExpBucketId">
+                            @foreach (var (bucket, _) in State.SavingBuckets)
+                            {
+                                <option value="@bucket.Id">@bucket.Name</option>
+                            }
+                        </select>
+                        <span class="arrow">→</span>
+                        <select @bind="_spendExpCategoryId">
+                            @foreach (var (cat, depth) in State.CategoryOptions)
+                            {
+                                <option value="@cat.Id">@IndentLabel(cat.Name, depth)</option>
+                            }
+                        </select>
+                        <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_spendExpAmount" />
+                        <button title="@Loc["Spend as expense"]" @onclick="SpendBucketAsExpense" disabled="@(_spendExpAmount <= 0 || _spendExpCategoryId == Guid.Empty)">💸</button>
+                    </div>
+                    <small class="hint">@Loc["Records a real expense paid straight from this bucket (dated today)."]</small>
                 </section>
             }
             break;
@@ -968,6 +1017,7 @@ else
     private Guid _fundId;
     private string? _note;
     private DateOnly _expenseDate = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly? _dayView;   // when set, the Expenses tab focuses a single day
 
     private Guid _transferFromId;
     private Guid _transferToId;
@@ -1015,6 +1065,10 @@ else
     private Guid _spendDestId;
     private decimal _spendAmount;
 
+    private Guid _spendExpBucketId;
+    private Guid _spendExpCategoryId;
+    private decimal _spendExpAmount;
+
     private Guid _editExpenseId;
     private Guid _modalBucketId;
     private decimal _goalAmount;
@@ -1052,13 +1106,28 @@ else
     private void OnChanged() { ResetPickers(); InvokeAsync(StateHasChanged); }
     private void OnLocChanged() => InvokeAsync(StateHasChanged);
 
+    // --- Expenses day view -----------------------------------------------
+    private void GoToDay(DateOnly d)
+    {
+        if (d < State.Period.From) d = State.Period.From;
+        else if (d > State.Period.To) d = State.Period.To;
+        _dayView = d;
+        _expenseDate = d;
+    }
+
+    private void PrevDay() { if (_dayView is { } d && d > State.Period.From) GoToDay(d.AddDays(-1)); }
+    private void NextDay() { if (_dayView is { } d && d < State.Period.To) GoToDay(d.AddDays(1)); }
+
     private void ResetPickers()
     {
         if (!State.IsReady || !State.HasAccounts) return;
+        _dayView = null;
         _categoryId = State.AllCategories.FirstOrDefault()?.Id ?? Guid.Empty;
         _savingBucketId = State.SavingBuckets.FirstOrDefault().Bucket?.Id ?? Guid.Empty;
         _spendBucketId = _savingBucketId;
         _spendDestId = _categoryId;
+        _spendExpBucketId = _savingBucketId;
+        _spendExpCategoryId = _categoryId;
         _fundId = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
         _transferFromId = _fundId;
         _transferToId = State.RootFunds.Skip(1).FirstOrDefault()?.Id ?? _fundId;
@@ -1097,7 +1166,8 @@ else
     {
         if (_amount <= 0) return;
         await State.AddExpense(_categoryId, _amount, _fundId, _note, _expenseDate);
-        _amount = 0; _note = null; _expenseDate = DateOnly.FromDateTime(DateTime.Today);
+        _amount = 0; _note = null;
+        _expenseDate = _dayView ?? DateOnly.FromDateTime(DateTime.Today);
     });
 
     private Task RecordDeposit(Guid memberId) => Run(async () =>
@@ -1180,6 +1250,13 @@ else
         if (_savingAmount <= 0) return;
         await State.AllocateSaving(_savingBucketId, _savingAmount, null);
         _savingAmount = 0;
+    });
+
+    private Task SpendBucketAsExpense() => Run(async () =>
+    {
+        if (_spendExpAmount <= 0 || _spendExpCategoryId == Guid.Empty) return;
+        await State.SpendFromSavings(_spendExpBucketId, _spendExpCategoryId, _spendExpAmount, null);
+        _spendExpAmount = 0;
     });
 
     private Task MoveSaving() => Run(async () =>
