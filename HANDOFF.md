@@ -17,7 +17,13 @@ Last updated: 2026-06-24. Read this + [README.md](README.md) + recent `git log` 
   - To rotate again: add a new secret version (`gcloud secrets versions add finapp-db --data-file=- --project
     finapp-1111`), then `gcloud run services update finapp --region europe-west1 --set-secrets=
     ConnectionStrings__FinApp=finapp-db:latest`. `gcloud run deploy --source .` keeps the secret binding (reuses config).
-  - **Still plaintext env vars:** `Jwt__Key` (the JWT signing key) could get the same Secret Manager treatment next.
+- ✅ **`Jwt__Key` rotated + moved to Secret Manager** (secret `finapp-jwt`, fresh 48-byte random key). Live on
+  **finapp-00016**. Only `Database__Provider` remains a plain env var; both `ConnectionStrings__FinApp` and
+  `Jwt__Key` are secret-backed. Rotating the key invalidated existing JWTs (everyone re-logs in).
+  - ⚠️ **gcloud gotcha:** `--set-secrets` **replaces the entire** secret-env list — passing one key drops the others
+    (this briefly broke the DB binding). Use `--update-secrets=KEY=secret:latest` to change one, or `--set-secrets`
+    with **all** keys listed. Current full form:
+    `--set-secrets="ConnectionStrings__FinApp=finapp-db:latest,Jwt__Key=finapp-jwt:latest"`.
 NOTE on working style (see memory): this user prefers I **proceed with sensible defaults rather than ask** — don't gate work behind clarifying questions; state assumptions and move.
 
 ## Session 9 (2026-06-24) — Account-tab cleanup (branch `feature/account-tab-changes`, commit 6397a29)
