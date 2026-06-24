@@ -17,6 +17,12 @@
         var cls = cov.IsOverBudget ? "over" : cov.ThresholdReached ? "warn" : "ok";
         <span class="tree-cov">
             <span class="tree-amt">@Fmt(cov.Spent) / @Fmt(cov.Allocated)</span>
+            @if (State.IsPeriodOpen)
+            {
+                <span class="tree-actions">
+                    <button title="Add expense in this category" @onclick="() => OnAddExpense.InvokeAsync(Node.Id)">🧾</button>
+                </span>
+            }
             <span class="tree-bar"><span class="tree-fill @cls" style="width:@(Math.Min(pct,100))%"></span></span>
             <span class="tree-pct @cls">@pct%</span>
         </span>
@@ -24,13 +30,12 @@
     else
     {
         <span class="tree-nobudget">no budget</span>
-    }
-
-    @if (State.IsPeriodOpen)
-    {
-        <span class="tree-actions">
-            <button title="Add expense in this category" @onclick="() => OnAddExpense.InvokeAsync(Node.Id)">🧾</button>
-        </span>
+        @if (State.IsPeriodOpen)
+        {
+            <span class="tree-actions">
+                <button title="Add expense in this category" @onclick="() => OnAddExpense.InvokeAsync(Node.Id)">🧾</button>
+            </span>
+        }
     }
 </div>
 
