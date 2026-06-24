@@ -159,8 +159,10 @@ public sealed class Localizer(IJSRuntime js)
         ["No buckets yet — add one to start saving."] = "Още няма каси — добави, за да започнеш да спестяваш.",
         ["Deposit"] = "Внеси",
         ["Total saved:"] = "Общо спестено:",
+        ["Total saved"] = "Общо спестено",
         ["this period:"] = "този период:",
         ["all periods:"] = "всички периоди:",
+        ["all periods"] = "всички периоди",
 
         // Contributions
         ["Categories"] = "Категории",

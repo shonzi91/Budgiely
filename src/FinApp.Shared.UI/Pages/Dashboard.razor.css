@@ -43,6 +43,7 @@
 .warn-text { color: #b45309; }
 
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.cards.cards-2 { grid-template-columns: repeat(2, 1fr); }
 .card {
     background: #fff; border: 1px solid #eceef2; border-radius: 14px;
     padding: 14px; display: flex; flex-direction: column; gap: 6px;
@@ -50,6 +51,7 @@
 }
 .card-label { color: #6b7280; font-size: .78rem; }
 .card-value { font-size: 1.25rem; font-weight: 700; }
+.card-sub { color: #6b7280; font-size: .76rem; }
 .card.savings { background: #f3f0ff; border-color: #e6def9; }
 .card.savings .card-value { color: #6b3fd4; }
 
@@ -96,6 +98,12 @@
 .bar-fill.over { background: #ef4444; }
 
 .form { display: grid; grid-template-columns: 1.4fr 1fr 1fr 2fr auto; gap: 8px; }
+/* Add-expense form: always one row; flexible selects/note, short amount + date. */
+.form.expense-form { display: flex; align-items: center; flex-wrap: nowrap; }
+.form.expense-form > select, .form.expense-form > input[type=text] { flex: 1 1 0; min-width: 0; }
+.form.expense-form > input[type=number] { flex: 0 0 88px; min-width: 0; }
+.form.expense-form > input[type=date] { flex: 0 0 130px; min-width: 0; }
+.form.expense-form > button { flex: 0 0 auto; }
 .form select, .form input {
     padding: 9px 10px; border: 1px solid #d8dce3; border-radius: 10px; font-size: .9rem; background: #fff;
 }

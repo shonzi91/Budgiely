@@ -274,6 +274,10 @@ else
             break;
 
         case Tab.Budgets:
+            <section class="cards cards-2">
+                <div class="card"><span class="card-label">@Loc["Budgeted"]</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
+                <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
+            </section>
             <section class="panel">
                 <div class="panel-head">
                     <h2>@Loc["Budgets"]</h2>
@@ -292,6 +296,10 @@ else
             break;
 
         case Tab.Expenses:
+            <section class="cards cards-2">
+                <div class="card"><span class="card-label">@Loc["Budgeted"]</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
+                <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
+            </section>
             <section class="panel">
                 <div class="panel-head">
                     <h2>@Loc["Add expense"]</h2>
@@ -305,7 +313,7 @@ else
                         </span>
                     }
                 </div>
-                <div class="form">
+                <div class="form expense-form">
                     <select @bind="_categoryId">
                         @foreach (var (cat, depth) in State.CategoryOptions)
                         {
@@ -367,16 +375,23 @@ else
             break;
 
         case Tab.Savings:
+            <section class="cards cards-2">
+                <div class="card savings">
+                    <span class="card-label">@Loc["Total saved"]</span>
+                    <span class="card-value">@Fmt(State.SavingsAccumulated)</span>
+                    <span class="card-sub">@PctOrDash(State.AccountSavingsRate) @Loc["all periods"]</span>
+                </div>
+                <div class="card savings">
+                    <span class="card-label">@Loc["Saved this period"]</span>
+                    <span class="card-value">@Fmt(State.SavingsThisPeriod)</span>
+                    <span class="card-sub">@PctOrDash(State.PeriodSavingsRate) @Loc["of contributions"]</span>
+                </div>
+            </section>
             <section class="panel">
                 <div class="panel-head">
                     <h2>@Loc["Savings buckets"]</h2>
                     <button class="link" title="Add a savings bucket" @onclick="OpenAddBucket">➕</button>
                 </div>
-                <p class="hint">
-                    <strong>@Loc["Total saved:"] @Fmt(State.SavingsAccumulated)</strong> ·
-                    @Loc["this period:"] <strong>@PctOrDash(State.PeriodSavingsRate)</strong> @Loc["of contributions"] ·
-                    @Loc["all periods:"] <strong>@PctOrDash(State.AccountSavingsRate)</strong>
-                </p>
                 <ul class="bucket-list">
                     @foreach (var (bucket, total) in State.SavingBuckets)
                     {
