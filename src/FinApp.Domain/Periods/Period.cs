@@ -103,12 +103,15 @@ public sealed class Period : Entity
 
     // --- Fund transfers & per-fund position -------------------------------
 
-    /// <summary>Record a transfer of money from one fund to another. Total-preserving — see <see cref="FundTransfer"/>.</summary>
+    /// <summary>Record a transfer of money from one fund to another. Total-preserving — see <see cref="FundTransfer"/>.
+    /// Capped at the source fund's current balance so a fund can't go negative.</summary>
     public FundTransfer TransferFunds(Guid fromFundId, Guid toFundId, Money amount, DateOnly date, string? note = null)
     {
         EnsureCurrency(amount);
         EnsureOpen();
-        var transfer = new FundTransfer(fromFundId, toFundId, amount, date, note);
+        var transfer = new FundTransfer(fromFundId, toFundId, amount, date, note); // validates funds differ + amount > 0
+        if (amount > FundBalance(fromFundId))
+            throw new InvalidOperationException($"That fund only holds {FundBalance(fromFundId)} to move.");
         _fundTransfers.Add(transfer);
         return transfer;
     }
@@ -158,6 +161,9 @@ public sealed class Period : Entity
     {
         EnsureCurrency(amount);
         EnsureOpen();
+        if (amount > FundBalance(fundId))
+            throw new InvalidOperationException(
+                $"That fund only holds {FundBalance(fundId)}; move money into it from another fund first.");
         if (amount > AvailableToTransferOut)
             throw new InvalidOperationException(
                 $"Can't send more than the unreserved cash ({AvailableToTransferOut}); the rest is earmarked for savings.");
@@ -179,6 +185,15 @@ public sealed class Period : Entity
             var free = ExpectedClosingBalance - earmarked;
             return free.IsNegative ? Money.Zero(Currency) : free;
         }
+    }
+
+    /// <summary>The most that can be sent out <b>from a specific fund</b>: the lower of what that fund actually
+    /// holds and the account-wide unreserved cash (so neither the fund nor the savings earmark goes negative).</summary>
+    public Money AvailableToTransferOutFromFund(Guid fundId)
+    {
+        var inFund = FundBalance(fundId);
+        var freeCash = AvailableToTransferOut;
+        return inFund < freeCash ? inFund : freeCash;
     }
 
     public void RemoveExternalTransfer(Guid transferId)

@@ -118,6 +118,8 @@ public sealed class Localizer(IJSRuntime js)
         ["Deposit to this fund"] = "Внеси в тази сметка",
         ["Transfer from"] = "Прехвърли от",
         ["To"] = "Към",
+        ["Available in this fund:"] = "Налично в тази сметка:",
+        ["what this fund holds, not earmarked for savings"] = "каквото е в сметката, незаделено за спестявания",
         ["Opening balance this period"] = "Начален баланс този период",
         ["Opening balance this period (optional)"] = "Начален баланс този период (по избор)",
         ["Manage categories"] = "Управление на категории",

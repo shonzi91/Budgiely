@@ -24,7 +24,7 @@ public class MoneyEnvelopeTests
         if (contributed > 0)
         {
             var member = account.AddMember(Guid.NewGuid(), "A");
-            period.Deposit(member.UserId, M(contributed));
+            period.Deposit(member.UserId, M(contributed), fundId: fund);
         }
         return period;
     }
@@ -142,6 +142,45 @@ public class MoneyEnvelopeTests
         period.RemoveExternalTransfer(transfer.Id);
         Assert.Equal(M(0), period.ExternalOutTotal);
         Assert.Equal(M(1000), period.ExpectedClosingBalance);
+    }
+
+    [Fact]
+    public void Transfer_out_cannot_exceed_the_source_fund_balance()
+    {
+        // Bank holds 200; Cash holds 500. You can't send 300 out of Bank even though the account holds 700.
+        var account = new Account("Home", Eur);
+        account.AddDefaultFunds();
+        var bank = account.FundId("Bank");
+        var cash = account.FundId("Cash");
+        var period = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        period.SetInitialBalance(bank, M(200));
+        period.SetInitialBalance(cash, M(500));
+
+        Assert.Equal(M(200), period.AvailableToTransferOutFromFund(bank));
+        Assert.Throws<InvalidOperationException>(
+            () => period.TransferOut(bank, M(300), new DateOnly(2026, 1, 5), Guid.NewGuid()));
+
+        // Top Bank up from Cash first, then the 300 send works.
+        period.TransferFunds(cash, bank, M(100), new DateOnly(2026, 1, 5));
+        Assert.Equal(M(300), period.AvailableToTransferOutFromFund(bank));
+        period.TransferOut(bank, M(300), new DateOnly(2026, 1, 6), Guid.NewGuid());
+        Assert.Equal(M(0), period.FundBalance(bank));
+    }
+
+    [Fact]
+    public void Internal_transfer_cannot_exceed_the_source_fund_balance()
+    {
+        var account = new Account("Home", Eur);
+        account.AddDefaultFunds();
+        var bank = account.FundId("Bank");
+        var cash = account.FundId("Cash");
+        var period = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        period.SetInitialBalance(bank, M(100));
+
+        Assert.Throws<InvalidOperationException>(
+            () => period.TransferFunds(bank, cash, M(150), new DateOnly(2026, 1, 5)));
+        period.TransferFunds(bank, cash, M(100), new DateOnly(2026, 1, 5)); // exactly the balance is fine
+        Assert.Equal(M(0), period.FundBalance(bank));
     }
 
     [Fact]

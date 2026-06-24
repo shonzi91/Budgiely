@@ -200,15 +200,15 @@ else
                                 }
                             </select>
                             <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_transferAmount" />
-                            <button title="@Loc["Transfer money"]" @onclick="DoTransfer" disabled="@(_transferAmount <= 0 || _transferDestId == Guid.Empty || _transferDestId == _transferFromId || (TransferDestIsAccount && _transferAmount > State.AvailableToTransferOut.Amount))">🔁</button>
+                            <button title="@Loc["Transfer money"]" @onclick="DoTransfer" disabled="@(_transferAmount <= 0 || _transferDestId == Guid.Empty || _transferDestId == _transferFromId || _transferAmount > InlineTransferMax)">🔁</button>
                         </div>
                         @if (TransferDestIsAccount)
                         {
-                            <small class="hint">@Loc["Sending to another account leaves this one as an outflow."] @Loc["Available to send:"] <strong>@Fmt(State.AvailableToTransferOut)</strong> (@Loc["cash not earmarked for savings"]).</small>
+                            <small class="hint">@Loc["Sending to another account leaves this one as an outflow."] @Loc["Available to send:"] <strong>@Fmt(State.AvailableToTransferOutFromFund(_transferFromId))</strong> (@Loc["what this fund holds, not earmarked for savings"]).</small>
                         }
                         else
                         {
-                            <small class="hint">@Loc["Move money between your funds — the total is unchanged, only where it sits."]</small>
+                            <small class="hint">@Loc["Move money between your funds — the total is unchanged, only where it sits."] @Loc["Available in this fund:"] <strong>@Fmt(State.FundBalance(_transferFromId))</strong></small>
                         }
                     }
                     @if (transfers.Any())
@@ -675,11 +675,15 @@ else
                     <label>@Loc["Amount"] <input type="number" step="0.01" min="0" @bind="_mTransferAmount" /></label>
                     @if (MTransferDestIsAccount)
                     {
-                        <small class="hint">@Loc["Available to send:"] <strong>@Fmt(State.AvailableToTransferOut)</strong> (@Loc["cash not earmarked for savings"]).</small>
+                        <small class="hint">@Loc["Available to send:"] <strong>@Fmt(State.AvailableToTransferOutFromFund(_mTransferFromId))</strong> (@Loc["what this fund holds, not earmarked for savings"]).</small>
+                    }
+                    else
+                    {
+                        <small class="hint">@Loc["Available in this fund:"] <strong>@Fmt(State.FundBalance(_mTransferFromId))</strong></small>
                     }
                     <div class="modal-actions">
                         <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
-                        <button @onclick="ConfirmTransfer" disabled="@(_mTransferAmount <= 0 || _mTransferDestId == Guid.Empty || _mTransferDestId == _mTransferFromId || (MTransferDestIsAccount && _mTransferAmount > State.AvailableToTransferOut.Amount))">🔁 @Loc["Transfer money"]</button>
+                        <button @onclick="ConfirmTransfer" disabled="@(_mTransferAmount <= 0 || _mTransferDestId == Guid.Empty || _mTransferDestId == _mTransferFromId || _mTransferAmount > MTransferMax)">🔁 @Loc["Transfer money"]</button>
                     </div>
                     break;
 
@@ -1550,6 +1554,12 @@ else
     /// <summary>True when the transfer destination is another account (an outflow), not one of this account's funds.</summary>
     private bool TransferDestIsAccount => State.TransferableAccounts.Any(a => a.Id == _transferDestId);
 
+    /// <summary>Cap for the inline transfer form: a fund move is limited to the fund's balance; an account send
+    /// to the fund's unreserved cash.</summary>
+    private decimal InlineTransferMax => TransferDestIsAccount
+        ? State.AvailableToTransferOutFromFund(_transferFromId).Amount
+        : State.FundBalance(_transferFromId).Amount;
+
     /// <summary>This period's fund-to-fund transfers and out-to-account transfers, merged newest-first.</summary>
     private List<(DateOnly Date, string Label, Money Amount, Guid Id, bool IsExternal, string? Note)> MergedTransfers() =>
         State.FundTransfers
@@ -1581,6 +1591,12 @@ else
     }
 
     private bool MTransferDestIsAccount => State.TransferableAccounts.Any(a => a.Id == _mTransferDestId);
+
+    /// <summary>Cap for the per-fund transfer popup: an account send is limited to the fund's unreserved cash;
+    /// an internal move is limited to the fund's balance.</summary>
+    private decimal MTransferMax => MTransferDestIsAccount
+        ? State.AvailableToTransferOutFromFund(_mTransferFromId).Amount
+        : State.FundBalance(_mTransferFromId).Amount;
 
     private Task ConfirmTransfer() => RunModal(async () =>
     {

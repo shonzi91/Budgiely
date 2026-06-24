@@ -258,6 +258,9 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
 
     /// <summary>Most that can be sent to another account without breaking the savings earmark.</summary>
     public Money AvailableToTransferOut => Period.AvailableToTransferOut;
+
+    /// <summary>Most that can be sent to another account from a specific fund (≤ that fund's balance).</summary>
+    public Money AvailableToTransferOutFromFund(Guid fundId) => Period.AvailableToTransferOutFromFund(fundId);
     public Money SavingsThisPeriod => Period.SavingsNetTotal;
     public Money SavingsAccumulated => _savings.AccumulatedTotal(Account);
     public Money MaxAdditionalSavings => Period.MaxAdditionalSavings;
