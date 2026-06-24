@@ -1,7 +1,24 @@
 # FinApp — session handoff
 
-Last updated: 2026-06-22. Read this + [README.md](README.md) + recent `git log` to catch up.
+Last updated: 2026-06-24. Read this + [README.md](README.md) + recent `git log` to catch up.
 NOTE on working style (see memory): this user prefers I **proceed with sensible defaults rather than ask** — don't gate work behind clarifying questions; state assumptions and move.
+
+## Session 9 (2026-06-24) — Account-tab cleanup (branch `feature/account-tab-changes`, commit 6397a29)
+Four UI changes (no domain math change; 77 domain tests still pass — domain test count is 77 now, not 74):
+1. **Removed the "contributed but not allocated" deposit gate** — `State.HasUnallocatedFunds`/`Unallocated`
+   deleted; the warn hint + deposit-button disable are gone. Deposits are never blocked now.
+2. **Savings panels renamed:** the move-to-budget/bucket panel "Spend savings" → **"Budget savings"**;
+   the real-expense panel "Spend as expense" → **"Spend savings"**. BG translations updated (Localizer:
+   `Budget savings`=Бюджетирай спестявания, `Spend savings`=Похарчи спестявания).
+3. **"Contributed" card → "Current"** (label flips to **"Closed on"** when the period is inactive). Value is
+   unchanged (`TotalContributed` = allocatable pool), so available-to-save still derives from it (hint now reads
+   "current − budgeted"). Period status badge **"Open" → "Active"**. **Removed the header "Closing" balance.**
+   ⚠️ ASSUMPTION (confirm): kept the card value = contributed pool and changed only the label, to avoid touching
+   the savings-envelope domain math + tests. If "Current" should instead show the live `ClosingBalance`
+   (opening + deposits − spent), that's a domain/AvailableToSave change.
+4. **Removed the "Recent expenses" section** (expenses live on the Expenses tab, grouped by date).
+   `BudgetingState.RecentExpenses` deleted.
+Pending: **item 5 — Account-tab UX/domain simplification suggestions** (delivered as a proposal, not yet built).
 
 ## Session 8 (2026-06-22) — deployed live + i18n + UX + Expenses features
 **LIVE at https://finapp-85638328674.europe-west1.run.app** (Google Cloud Run, project `finapp-1111`, region
