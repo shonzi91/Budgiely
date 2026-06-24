@@ -228,45 +228,6 @@ else
 
             <section class="panel">
                 <h2>@Loc["Contributions"]</h2>
-                @if (State.CarryoverThisPeriod.Amount != 0)
-                {
-                    <ul class="list">
-                        <li class="contrib">
-                            <span class="contrib-name">@Loc["From previous period"]</span>
-                            <span class="contrib-state">
-                                @if (State.CarryoverThisPeriod.Amount < 0)
-                                {
-                                    <span class="warn-text">@Fmt(State.CarryoverThisPeriod) shortfall</span>
-                                }
-                                else
-                                {
-                                    <span>@Fmt(State.CarryoverThisPeriod) carried in (added to the pool)</span>
-                                }
-                            </span>
-                        </li>
-                    </ul>
-                    @if (State.IsPeriodOpen && State.HasUnallocatedShortfall)
-                    {
-                        @if (State.SavingBuckets.Any())
-                        {
-                            <div class="form">
-                                <select @bind="_coverBucketId">
-                                    @foreach (var (bucket, _) in State.SavingBuckets)
-                                    {
-                                        <option value="@bucket.Id">@bucket.Name</option>
-                                    }
-                                </select>
-                                <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_coverAmount" />
-                                <button @onclick="CoverShortfall" disabled="@(_coverAmount <= 0 || _coverBucketId == Guid.Empty)">@Loc["Cover shortfall"]</button>
-                            </div>
-                            <small class="hint">@Fmt(State.UnallocatedShortfall) still to cover — pull it from a savings bucket, or it offsets automatically as you add deposits.</small>
-                        }
-                        else
-                        {
-                            <p class="hint warn-text">@Fmt(State.UnallocatedShortfall) still unallocated — add deposits (which offset it automatically).</p>
-                        }
-                    }
-                }
 
                 @if (State.IsPeriodOpen)
                 {
@@ -479,7 +440,7 @@ else
                         <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_savingAmount" />
                         <button title="Add to savings" @onclick="AllocateSaving" disabled="@(_savingAmount <= 0 || _savingAmount > State.MaxAdditionalSavings.Amount)">💰</button>
                     </div>
-                    <small class="hint">Available to save: <strong>@Fmt(State.MaxAdditionalSavings)</strong> (contributed − budgeted).</small>
+                    <small class="hint">Available to save: <strong>@Fmt(State.MaxAdditionalSavings)</strong> (the money in the account, minus what's budgeted and already saved).</small>
                     @if (State.SavingDepositsThisPeriod.Any())
                     {
                         <ul class="list">
@@ -512,12 +473,6 @@ else
                         </select>
                         <span class="arrow">→</span>
                         <select @bind="_spendDestId">
-                            @if (State.HasUnallocatedShortfall)
-                            {
-                                <optgroup label="Shortfall">
-                                    <option value="@BudgetingState.CarryoverCategoryId">From previous period (cover @Fmt(State.UnallocatedShortfall))</option>
-                                </optgroup>
-                            }
                             <optgroup label="Budgets">
                                 @foreach (var (cat, depth) in State.CategoryOptions)
                                 {
@@ -710,7 +665,7 @@ else
 
                 case Modal.NextPeriod:
                     <h3>Start next month</h3>
-                    <p class="hint">Enter what each fund really holds now (previous closing balance: <strong>@Fmt(State.Period.ExpectedClosingBalance)</strong>). The leftover carries in as a “From previous period” contribution.</p>
+                    <p class="hint">Enter what each fund really holds now (previous closing balance: <strong>@Fmt(State.Period.ExpectedClosingBalance)</strong>). These become the new period's opening balances — that money carries over and is fully available to budget or save.</p>
                     @foreach (var f in State.RootFunds)
                     {
                         <label>@f.Name <input type="number" step="0.01" @bind:get="GetRealOpening(f.Id)" @bind:set="v => SetRealOpening(f.Id, v)" /></label>
@@ -1073,9 +1028,6 @@ else
     private DateOnly _depDate = DateOnly.FromDateTime(DateTime.Today);
     private bool _depShowDetails;
 
-    private Guid _coverBucketId;
-    private decimal _coverAmount;
-
     private Guid _editContribId;
     private Guid _editContribCategoryId;
     private Guid _editContribFundId;
@@ -1175,8 +1127,6 @@ else
         _transferFromId = _fundId;
         _transferDestId = State.RootFunds.Skip(1).FirstOrDefault()?.Id
             ?? State.TransferableAccounts.FirstOrDefault()?.Id ?? Guid.Empty;
-        _coverBucketId = _savingBucketId;
-        _coverAmount = State.HasUnallocatedShortfall ? State.UnallocatedShortfall.Amount : 0m;
     }
 
     private async Task Run(Func<Task> action)
@@ -1332,9 +1282,7 @@ else
     private Task MoveSaving() => Run(async () =>
     {
         if (_spendAmount <= 0 || _spendDestId == Guid.Empty || _spendDestId == _spendBucketId) return;
-        if (_spendDestId == BudgetingState.CarryoverCategoryId)
-            await State.CoverCarryoverFromSavings(_spendBucketId, _spendAmount);
-        else if (State.SavingBuckets.Any(b => b.Bucket.Id == _spendDestId))
+        if (State.SavingBuckets.Any(b => b.Bucket.Id == _spendDestId))
             await State.MoveSavingToBucket(_spendBucketId, _spendDestId, _spendAmount, null);
         else
             await State.ConvertSavingToBudget(_spendBucketId, _spendDestId, _spendAmount, "From savings");
@@ -1525,13 +1473,6 @@ else
         else
             await State.TransferFunds(_transferFromId, _transferDestId, _transferAmount, _transferNote);
         _transferAmount = 0; _transferNote = null;
-    });
-
-    private Task CoverShortfall() => Run(async () =>
-    {
-        if (_coverAmount <= 0 || _coverBucketId == Guid.Empty) return;
-        await State.CoverCarryoverFromSavings(_coverBucketId, _coverAmount);
-        _coverAmount = 0;
     });
 
     private void OpenEditTransfer(Guid id)

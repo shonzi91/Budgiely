@@ -20,6 +20,25 @@ Four UI changes (no domain math change; 77 domain tests still pass — domain te
    need. If the user later wants savings capped by total balance, that's a deeper domain change.
 4. **Removed the "Recent expenses" section** (expenses live on the Expenses tab, grouped by date).
    `BudgetingState.RecentExpenses` deleted.
+**Money model redesign (2026-06-24, domain change; 73 domain + 5 persistence + 19 server pass):**
+Re-based allocation on **the money you actually have** and dropped the signed-carryover machinery.
+- **`AvailableToSave = ExpectedClosingBalance − BudgetedTotal`** (was `Allocatable − BudgetedTotal`). So
+  `MaxAdditionalSavings = max(0, money-in-account − budgeted − saved)`. **Opening fund balances now count** toward
+  what you can save/budget — carried-over money simply sits in the openings, so it's spendable with no separate
+  mechanism. The **budget cap** moved to the same basis: `budgeted + saved ≤ ExpectedClosingBalance`.
+- **Carryover is now positive-only / implicit.** Removed `Period.Allocatable`, `SetCarryover`, `CarryoverTotal`,
+  `UnallocatedShortfall`, `CoverCarryoverFromSavings`, and the `CarryoverSource` branches in
+  `Remove/EditSavingMovement`. `Period.CarriedIn` is now **vestigial** (kept as an always-zero field +
+  EF column + serializer field purely for back-compat — no migration). `CarryoverSource` const kept so legacy
+  snapshots still deserialize. `StartNextPeriod` no longer calls `SetCarryover` — it just sets the real opening
+  balances. UI: removed the "From previous period" row, the inline "Cover shortfall" form, the shortfall optgroup
+  in Budget-savings, and `BudgetingState.{UnallocatedShortfall,HasUnallocatedShortfall,CarryoverCategoryId,
+  CoverCarryoverFromSavings,CarryoverThisPeriod}`.
+- Tests: deleted the 4 obsolete carryover/shortfall tests, inverted `Opening_funds_*` to assert openings count,
+  rewrote the carryover test as `Opening_balances_carry_over_and_are_fully_allocatable`. (Domain 77 → 73.)
+- ⚠️ **Known caveat (told the user):** because the cap base subtracts expenses, editing a budget *after* spending
+  against it can be limited (the spent money lowers the ceiling). Acceptable for now; revisit if it bites.
+
 **Item 5 — Account-tab simplification (built; UI-only, no domain change; 77 domain tests + Web build green):**
 - **Unified "Transfer money" panel** replaces the always-on inline fund-transfer form **and** the 📤 send-to-account
   modal. One `From [fund] → To [fund | other account]` picker (grouped `<optgroup>`s) + amount + note; `DoTransfer()`

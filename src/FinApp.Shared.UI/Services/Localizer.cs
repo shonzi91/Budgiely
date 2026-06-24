@@ -107,7 +107,6 @@ public sealed class Localizer(IJSRuntime js)
         ["Other accounts"] = "Други профили",
         ["Move money between your funds (the total is unchanged), or send it to another account (it leaves this one as an outflow)."] =
             "Премести пари между сметките си (общата сума не се променя) или ги изпрати към друг профил (напуска този като изходящо).",
-        ["Cover shortfall"] = "Покрий недостига",
         ["Category & fund"] = "Категория и сметка",
         ["Contributions"] = "Вноски",
         ["Add expense"] = "Добави разход",
@@ -118,7 +117,6 @@ public sealed class Localizer(IJSRuntime js)
         ["Spend savings"] = "Похарчи спестявания",
         ["Records a real expense paid straight from this bucket (dated today)."] =
             "Записва реален разход, платен директно от тази каса (с днешна дата).",
-        ["From previous period"] = "От предишен период",
         ["Previous day"] = "Предишен ден",
         ["Next day"] = "Следващ ден",
         ["All days"] = "Всички дни",
