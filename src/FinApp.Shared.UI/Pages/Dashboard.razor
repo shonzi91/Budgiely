@@ -482,17 +482,17 @@ else
             @switch (_modal)
             {
                 case Modal.AddCat:
-                    <h3>Add category @(_addParentId is {} p ? $"under {State.CategoryName(p)}" : "(top level)")</h3>
+                    <h3>@Loc["Add category"] @(_addParentId is {} p ? $"under {State.CategoryName(p)}" : "(top level)")</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
                     <label>Budget for this period (optional) <input type="number" step="0.01" min="0" @bind="_fBudget" /></label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveAddCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">Add</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveAddCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Add"]</button>
                     </div>
                     break;
 
                 case Modal.EditCat:
-                    <h3>Edit @State.CategoryName(_modalCatId)</h3>
+                    <h3>@Loc["Edit"] @State.CategoryName(_modalCatId)</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
                     <label>Budget amount <input type="number" step="0.01" min="0" @bind="_fBudget" /></label>
                     <label>Alert at % <input type="number" step="1" min="0" max="100" @bind="_fThreshold" /></label>
@@ -502,59 +502,59 @@ else
                         {
                             <button class="ghost danger" @onclick="RemoveBudget">Remove budget</button>
                         }
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveEditCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">Save</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveEditCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Save"]</button>
                     </div>
                     break;
 
                 case Modal.DeleteCat:
-                    <h3>Delete @State.CategoryName(_modalCatId)?</h3>
+                    <h3>@Loc["Delete"] @State.CategoryName(_modalCatId)?</h3>
                     @if (State.CategoryRemovalBlocker(_modalCatId) is {} blocker)
                     {
                         <p class="hint">Can’t delete — @blocker. Remove those first.</p>
-                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">Close</button></div>
+                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">@Loc["Close"]</button></div>
                     }
                     else
                     {
                         <p class="hint">This removes the category permanently.</p>
                         <div class="modal-actions">
-                            <button class="ghost" @onclick="CloseModal">Cancel</button>
-                            <button class="danger-btn" @onclick="ConfirmDelete">Delete</button>
+                            <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                            <button class="danger-btn" @onclick="ConfirmDelete">@Loc["Delete"]</button>
                         </div>
                     }
                     break;
 
                 case Modal.AddAccount:
-                    <h3>New account</h3>
+                    <h3>@Loc["New account"]</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
                     <label>Currency <input type="text" maxlength="3" @bind="_fCurrency" /></label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveAddAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">Create</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveAddAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Create"]</button>
                     </div>
                     break;
 
                 case Modal.EditAccount:
-                    <h3>Rename account</h3>
+                    <h3>@Loc["Rename account"]</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
                     <p class="hint">Currency (@State.Currency) can't be changed once an account exists.</p>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveEditAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">Save</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveEditAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Save"]</button>
                     </div>
                     break;
 
                 case Modal.DeleteAccount:
-                    <h3>Delete @State.Account.Name?</h3>
+                    <h3>@Loc["Delete"] @State.Account.Name?</h3>
                     <p class="hint">This permanently deletes the account and <strong>all its periods, budgets, expenses and savings</strong>. This can't be undone.</p>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
                         <button class="danger-btn" @onclick="ConfirmDeleteAccount">Delete account</button>
                     </div>
                     break;
 
                 case Modal.Invite:
-                    <h3>Invite to @State.Account.Name</h3>
+                    <h3>@Loc["Invite to"] @State.Account.Name</h3>
                     <p class="hint">Enter the username of an existing FinApp user. They'll get a prompt to accept; once they do, they can edit everything except deleting the account.</p>
                     <label>Username <input type="text" @bind="_inviteUsername" @bind:event="oninput" /></label>
                     @if (_inviteMessage is not null)
@@ -562,7 +562,7 @@ else
                         <div class="alert">@_inviteMessage</div>
                     }
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Close</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Close"]</button>
                         <button @onclick="SendInvite" disabled="@(string.IsNullOrWhiteSpace(_inviteUsername))">Send invite</button>
                     </div>
                     break;
@@ -581,22 +581,22 @@ else
                     </label>
                     <label>Note (optional) <input type="text" @bind="_note" /></label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="AddExpenseFromModal" disabled="@(_amount <= 0)">Add</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="AddExpenseFromModal" disabled="@(_amount <= 0)">@Loc["Add"]</button>
                     </div>
                     break;
 
                 case Modal.RemovePeriod:
-                    <h3>Remove this period?</h3>
+                    <h3>@Loc["Remove this period?"]</h3>
                     <p class="hint">This deletes period @State.PeriodNumber (@State.Period.From.ToString("dd MMM") – @State.Period.To.ToString("dd MMM yyyy")) and everything in it, then re-opens the previous period as active. This can't be undone.</p>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
                         <button class="danger-btn" @onclick="ConfirmRemovePeriod">Remove period</button>
                     </div>
                     break;
 
                 case Modal.NextPeriod:
-                    <h3>Start next month</h3>
+                    <h3>@Loc["Start next month"]</h3>
                     <p class="hint">Enter what each fund really holds now (previous closing balance: <strong>@Fmt(State.Period.ExpectedClosingBalance)</strong>). These become the new period's opening balances — that money carries over and is fully available to budget or save.</p>
                     @foreach (var f in State.RootFunds)
                     {
@@ -604,13 +604,13 @@ else
                     }
                     <label class="check"><input type="checkbox" @bind="_copyBudgets" /> Copy this period’s budgets forward</label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
                         <button @onclick="ConfirmNextPeriod">Start next month →</button>
                     </div>
                     break;
 
                 case Modal.EditExpense:
-                    <h3>Edit expense</h3>
+                    <h3>@Loc["Edit expense"]</h3>
                     <label>Category
                         <select @bind="_categoryId">
                             @foreach (var (cat, depth) in State.CategoryOptions)
@@ -631,20 +631,20 @@ else
                     </label>
                     <label>Note (optional) <input type="text" @bind="_note" /></label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveEditExpense" disabled="@(_amount <= 0)">Save</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveEditExpense" disabled="@(_amount <= 0)">@Loc["Save"]</button>
                     </div>
                     break;
 
                 case Modal.DeleteExpense:
-                    <h3>Remove this expense?</h3>
+                    <h3>@Loc["Remove this expense?"]</h3>
                     @if (State.FindExpense(_editExpenseId) is { } ex)
                     {
                         <p class="hint">@ex.Date.ToString("dd MMM") · @State.CategoryName(ex.CategoryId) · @Fmt(ex.Amount)@(ex.IsFromSavings ? " — the savings drawdown will be restored." : "")</p>
                     }
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button class="danger-btn" @onclick="ConfirmDeleteExpense">Remove</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteExpense">@Loc["Remove"]</button>
                     </div>
                     break;
 
@@ -661,7 +661,7 @@ else
                         <small class="hint">Money you already had in this bucket before using FinApp. It counts toward the balance and goal, but not toward your savings rate.</small>
                     }
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
                         <button @onclick="SaveBucket" disabled="@(string.IsNullOrWhiteSpace(_fName))">@(_modal == Modal.AddBucket ? "Add" : "Save")</button>
                     </div>
                     break;
@@ -872,36 +872,36 @@ else
                     <h3>Edit savings deposit — @State.SavingBucketName(_savingDepositBucketId)</h3>
                     <label>Amount <input type="number" step="0.01" min="0" @bind="_savingDepositAmount" /></label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveEditSavingDeposit" disabled="@(_savingDepositAmount <= 0)">Save</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveEditSavingDeposit" disabled="@(_savingDepositAmount <= 0)">@Loc["Save"]</button>
                     </div>
                     break;
 
                 case Modal.DeleteSavingDeposit:
-                    <h3>Remove this savings deposit?</h3>
+                    <h3>@Loc["Remove this savings deposit?"]</h3>
                     @if (State.FindSavingDeposit(_savingDepositId) is { } sd)
                     {
                         <p class="hint">@sd.Date.ToString("dd MMM") · @State.SavingBucketName(sd.SavingCategoryId) · @Fmt(sd.Amount)</p>
                     }
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button class="danger-btn" @onclick="ConfirmDeleteSavingDeposit">Remove</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteSavingDeposit">@Loc["Remove"]</button>
                     </div>
                     break;
 
                 case Modal.DeleteBucket:
-                    <h3>Remove @State.FindSavingBucket(_modalBucketId)?.Name?</h3>
+                    <h3>@Loc["Remove"] @State.FindSavingBucket(_modalBucketId)?.Name?</h3>
                     @if (State.SavingBucketRemovalBlocker(_modalBucketId) is {} bucketBlocker)
                     {
                         <p class="hint">Can’t remove — @bucketBlocker. Spend or move its savings first.</p>
-                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">Close</button></div>
+                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">@Loc["Close"]</button></div>
                     }
                     else
                     {
                         <p class="hint">This removes the empty bucket permanently.</p>
                         <div class="modal-actions">
-                            <button class="ghost" @onclick="CloseModal">Cancel</button>
-                            <button class="danger-btn" @onclick="ConfirmDeleteBucket">Remove</button>
+                            <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                            <button class="danger-btn" @onclick="ConfirmDeleteBucket">@Loc["Remove"]</button>
                         </div>
                     }
                     break;
@@ -929,11 +929,11 @@ else
                     break;
 
                 case Modal.DeleteFund:
-                    <h3>Remove @State.FundName(_modalFundId)?</h3>
+                    <h3>@Loc["Remove"] @State.FundName(_modalFundId)?</h3>
                     @if (State.FundRemovalBlocker(_modalFundId) is {} fundBlocker)
                     {
                         <p class="hint">Can’t remove — @fundBlocker.</p>
-                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">Close</button></div>
+                        <div class="modal-actions"><button class="ghost" @onclick="CloseModal">@Loc["Close"]</button></div>
                     }
                     else
                     {
@@ -955,14 +955,14 @@ else
                             <p class="hint">This removes the fund permanently.</p>
                         }
                         <div class="modal-actions">
-                            <button class="ghost" @onclick="CloseModal">Cancel</button>
-                            <button class="danger-btn" @onclick="ConfirmDeleteFund">Remove</button>
+                            <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                            <button class="danger-btn" @onclick="ConfirmDeleteFund">@Loc["Remove"]</button>
                         </div>
                     }
                     break;
 
                 case Modal.EditTransfer:
-                    <h3>Edit transfer</h3>
+                    <h3>@Loc["Edit transfer"]</h3>
                     <label>From
                         <select @bind="_editTransferFromId">
                             @foreach (var f in State.RootFunds)
@@ -982,44 +982,44 @@ else
                     <label>Amount <input type="number" step="0.01" min="0" @bind="_editTransferAmount" /></label>
                     <label>Note (optional) <input type="text" @bind="_editTransferNote" /></label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveEditTransfer" disabled="@(_editTransferAmount <= 0 || _editTransferFromId == _editTransferToId)">Save</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveEditTransfer" disabled="@(_editTransferAmount <= 0 || _editTransferFromId == _editTransferToId)">@Loc["Save"]</button>
                     </div>
                     break;
 
                 case Modal.DeleteTransfer:
-                    <h3>Remove this transfer?</h3>
+                    <h3>@Loc["Remove this transfer?"]</h3>
                     @if (State.FindFundTransfer(_editTransferId) is { } tr)
                     {
                         <p class="hint">@tr.Date.ToString("dd MMM") · @State.FundName(tr.FromFundId) → @State.FundName(tr.ToFundId) · @Fmt(tr.Amount)</p>
                     }
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button class="danger-btn" @onclick="ConfirmDeleteTransfer">Remove</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteTransfer">@Loc["Remove"]</button>
                     </div>
                     break;
 
                 case Modal.EditPeriod:
-                    <h3>Edit period dates</h3>
+                    <h3>@Loc["Edit period dates"]</h3>
                     <label>From <input type="date" @bind="_periodFrom" /></label>
                     <label>To <input type="date" @bind="_periodTo" /></label>
                     <p class="hint">Later periods shift to stay contiguous, keeping their own lengths.</p>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveEditPeriod" disabled="@(_periodTo < _periodFrom)">Save</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveEditPeriod" disabled="@(_periodTo < _periodFrom)">@Loc["Save"]</button>
                     </div>
                     break;
 
                 case Modal.EditSavingMovement:
-                    <h3>Edit savings movement</h3>
+                    <h3>@Loc["Edit savings movement"]</h3>
                     @if (State.FindSavingMovement(_savingMovementId) is { } mv)
                     {
                         <p class="hint">@State.SavingMovementTarget(mv)</p>
                     }
                     <label>Amount <input type="number" step="0.01" min="0" @bind="_savingMovementAmount" /></label>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button @onclick="SaveEditSavingMovement" disabled="@(_savingMovementAmount <= 0)">Save</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="SaveEditSavingMovement" disabled="@(_savingMovementAmount <= 0)">@Loc["Save"]</button>
                     </div>
                     break;
 
@@ -1030,21 +1030,21 @@ else
                         <p class="hint">@mvd.Date.ToString("dd MMM") · @State.SavingMovementTarget(mvd) · @Fmt(State.Money(-mvd.Amount.Amount)). @(mvd.BudgetCategoryId is not null ? "The funded budget is reduced by this amount." : "Both buckets are restored.")</p>
                     }
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
                         <button class="danger-btn" @onclick="ConfirmDeleteSavingMovement">Undo</button>
                     </div>
                     break;
 
                 case Modal.DeleteExternalTransfer:
-                    <h3>Remove this outgoing transfer?</h3>
+                    <h3>@Loc["Remove this outgoing transfer?"]</h3>
                     @if (State.FindExternalTransfer(_extTransferId) is { } et)
                     {
                         <p class="hint">@et.Date.ToString("dd MMM") · @State.FundName(et.FundId) → @State.AccountName(et.ToAccountId ?? Guid.Empty) · @Fmt(et.Amount)</p>
                     }
                     <p class="hint warn-text">This only removes the outflow on this side. It does not reverse the deposit already recorded in the other account.</p>
                     <div class="modal-actions">
-                        <button class="ghost" @onclick="CloseModal">Cancel</button>
-                        <button class="danger-btn" @onclick="ConfirmDeleteExternalTransfer">Remove</button>
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button class="danger-btn" @onclick="ConfirmDeleteExternalTransfer">@Loc["Remove"]</button>
                     </div>
                     break;
             }

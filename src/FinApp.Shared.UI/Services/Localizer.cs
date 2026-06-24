@@ -179,6 +179,22 @@ public sealed class Localizer(IJSRuntime js)
         ["Remove category?"] = "Премахване на категория?",
         ["This removes the category permanently."] = "Това премахва категорията завинаги.",
 
+        // Modal titles
+        ["New account"] = "Нов профил",
+        ["Rename account"] = "Преименувай профил",
+        ["Remove this period?"] = "Премахване на този период?",
+        ["Start next month"] = "Започни следващ месец",
+        ["Edit expense"] = "Редактирай разход",
+        ["Remove this expense?"] = "Премахване на този разход?",
+        ["Remove this savings deposit?"] = "Премахване на тази спестовна вноска?",
+        ["Edit transfer"] = "Редактирай прехвърляне",
+        ["Remove this transfer?"] = "Премахване на това прехвърляне?",
+        ["Edit period dates"] = "Редактирай датите на периода",
+        ["Edit savings movement"] = "Редактирай спестовно движение",
+        ["Remove this outgoing transfer?"] = "Премахване на това изходящо прехвърляне?",
+        ["Invite to"] = "Покани в",
+        ["Edit savings deposit"] = "Редактирай спестовна вноска",
+
         // Modal action buttons
         ["Cancel"] = "Отказ",
         ["Save"] = "Запази",
