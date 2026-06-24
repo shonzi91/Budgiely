@@ -158,9 +158,27 @@ public sealed class Period : Entity
     {
         EnsureCurrency(amount);
         EnsureOpen();
+        if (amount > AvailableToTransferOut)
+            throw new InvalidOperationException(
+                $"Can't send more than the unreserved cash ({AvailableToTransferOut}); the rest is earmarked for savings.");
         var transfer = new ExternalTransfer(fundId, amount, date, toAccountId, note);
         _externalTransfers.Add(transfer);
         return transfer;
+    }
+
+    /// <summary>
+    /// The most that can be sent out to another account without going underwater: the cash actually in the
+    /// account (<see cref="ExpectedClosingBalance"/>) minus what's already earmarked for savings. Unlike an
+    /// expense (which may overspend), a discretionary transfer shouldn't break the savings earmark.
+    /// </summary>
+    public Money AvailableToTransferOut
+    {
+        get
+        {
+            var earmarked = SavingsNetTotal.IsNegative ? Money.Zero(Currency) : SavingsNetTotal;
+            var free = ExpectedClosingBalance - earmarked;
+            return free.IsNegative ? Money.Zero(Currency) : free;
+        }
     }
 
     public void RemoveExternalTransfer(Guid transferId)

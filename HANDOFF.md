@@ -38,6 +38,14 @@ Re-based allocation on **the money you actually have** and dropped the signed-ca
   rewrote the carryover test as `Opening_balances_carry_over_and_are_fully_allocatable`. (Domain 77 → 73.)
 - ⚠️ **Known caveat (told the user):** because the cap base subtracts expenses, editing a budget *after* spending
   against it can be limited (the spent money lowers the ceiling). Acceptable for now; revisit if it bites.
+- **Follow-up (2026-06-24, after user saw a confusing over-committed period): transfer guard + deficit annotation.**
+  Expenses stay uncapped (overspending allowed), but a *discretionary* transfer-out can no longer break the
+  savings earmark: `Period.TransferOut` throws if `amount > AvailableToTransferOut`
+  (= `ExpectedClosingBalance − max(0, SavingsNetTotal)`). New `Period.AvailableToTransferOut` +
+  `BudgetingState.{AvailableToTransferOut, HasDeficit}`. UI: the Transfer-money form caps/​disables sends to
+  another account at the unreserved cash and shows "Available to send: X"; the **Saved this period** card shows
+  "€X not backed by cash" (the Deficit) instead of the savings % when underwater. Test:
+  `Transfer_out_cannot_break_the_savings_earmark`. 74 domain tests pass.
 
 **Item 5 — Account-tab simplification (built; UI-only, no domain change; 77 domain tests + Web build green):**
 - **Unified "Transfer money" panel** replaces the always-on inline fund-transfer form **and** the 📤 send-to-account

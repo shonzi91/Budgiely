@@ -145,6 +145,23 @@ public class MoneyEnvelopeTests
     }
 
     [Fact]
+    public void Transfer_out_cannot_break_the_savings_earmark()
+    {
+        // 1000 cash, 800 earmarked for savings → only 200 is free to send away.
+        var period = PeriodWith(opening: 0, contributed: 1000, out _, out var fund, out _);
+        period.AllocateToSavings(Guid.NewGuid(), M(800), new DateOnly(2026, 1, 2));
+
+        Assert.Equal(M(200), period.AvailableToTransferOut);
+        Assert.Throws<InvalidOperationException>(
+            () => period.TransferOut(fund, M(300), new DateOnly(2026, 1, 5), Guid.NewGuid()));
+
+        period.TransferOut(fund, M(200), new DateOnly(2026, 1, 5), Guid.NewGuid()); // exactly the free cash is fine
+        Assert.Equal(M(800), period.ExpectedClosingBalance);
+        Assert.Equal(M(0), period.Deficit);                       // savings still fully backed
+        Assert.Equal(M(0), period.AvailableToTransferOut);
+    }
+
+    [Fact]
     public void Saving_moved_to_a_budget_is_listed_and_can_be_undone()
     {
         var period = PeriodWith(opening: 0, contributed: 1000, out _, out _, out var category);

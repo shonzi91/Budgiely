@@ -254,6 +254,10 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
 
     /// <summary>Savings earmarked beyond actual cash left — overspend to reconcile next period.</summary>
     public Money Deficit => Period.Deficit;
+    public bool HasDeficit => Period.Deficit.Amount > 0m;
+
+    /// <summary>Most that can be sent to another account without breaking the savings earmark.</summary>
+    public Money AvailableToTransferOut => Period.AvailableToTransferOut;
     public Money SavingsThisPeriod => Period.SavingsNetTotal;
     public Money SavingsAccumulated => _savings.AccumulatedTotal(Account);
     public Money MaxAdditionalSavings => Period.MaxAdditionalSavings;

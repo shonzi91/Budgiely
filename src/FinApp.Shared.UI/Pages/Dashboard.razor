@@ -108,7 +108,14 @@ else
                 <div class="card savings">
                     <span class="card-label">@Loc["Saved this period"]</span>
                     <span class="card-value">@Fmt(State.SavingsThisPeriod)</span>
-                    <span class="card-sub">@PctOrDash(State.PeriodSavingsRate) @Loc["of contributions"]</span>
+                    @if (State.HasDeficit)
+                    {
+                        <span class="card-sub warn-text">@Fmt(State.Deficit) @Loc["not backed by cash"]</span>
+                    }
+                    else
+                    {
+                        <span class="card-sub">@PctOrDash(State.PeriodSavingsRate) @Loc["of contributions"]</span>
+                    }
                 </div>
             </section>
 
@@ -196,9 +203,16 @@ else
                             </select>
                             <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_transferAmount" />
                             <input type="text" placeholder="@Loc["Note (optional)"]" @bind="_transferNote" />
-                            <button title="@Loc["Transfer money"]" @onclick="DoTransfer" disabled="@(_transferAmount <= 0 || _transferDestId == Guid.Empty || _transferDestId == _transferFromId)">🔁</button>
+                            <button title="@Loc["Transfer money"]" @onclick="DoTransfer" disabled="@(_transferAmount <= 0 || _transferDestId == Guid.Empty || _transferDestId == _transferFromId || (TransferDestIsAccount && _transferAmount > State.AvailableToTransferOut.Amount))">🔁</button>
                         </div>
-                        <small class="hint">@Loc["Move money between your funds (the total is unchanged), or send it to another account (it leaves this one as an outflow)."]</small>
+                        @if (TransferDestIsAccount)
+                        {
+                            <small class="hint">@Loc["Sending to another account leaves this one as an outflow."] @Loc["Available to send:"] <strong>@Fmt(State.AvailableToTransferOut)</strong> (@Loc["cash not earmarked for savings"]).</small>
+                        }
+                        else
+                        {
+                            <small class="hint">@Loc["Move money between your funds — the total is unchanged, only where it sits."]</small>
+                        }
                     }
                     @if (transfers.Any())
                     {
@@ -1455,6 +1469,9 @@ else
 
     private bool CanTransfer =>
         State.IsPeriodOpen && State.RootFunds.Any() && (State.RootFunds.Count > 1 || State.TransferableAccounts.Any());
+
+    /// <summary>True when the transfer destination is another account (an outflow), not one of this account's funds.</summary>
+    private bool TransferDestIsAccount => State.TransferableAccounts.Any(a => a.Id == _transferDestId);
 
     /// <summary>This period's fund-to-fund transfers and out-to-account transfers, merged newest-first.</summary>
     private List<(DateOnly Date, string Label, Money Amount, Guid Id, bool IsExternal, string? Note)> MergedTransfers() =>

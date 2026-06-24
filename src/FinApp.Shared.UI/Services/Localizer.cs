@@ -105,8 +105,13 @@ public sealed class Localizer(IJSRuntime js)
         ["Funds"] = "Сметки",
         ["Transfer money"] = "Прехвърли пари",
         ["Other accounts"] = "Други профили",
-        ["Move money between your funds (the total is unchanged), or send it to another account (it leaves this one as an outflow)."] =
-            "Премести пари между сметките си (общата сума не се променя) или ги изпрати към друг профил (напуска този като изходящо).",
+        ["Move money between your funds — the total is unchanged, only where it sits."] =
+            "Премести пари между сметките си — общата сума не се променя, само къде стои.",
+        ["Sending to another account leaves this one as an outflow."] =
+            "Изпращането към друг профил напуска този като изходящо.",
+        ["Available to send:"] = "Налично за изпращане:",
+        ["cash not earmarked for savings"] = "пари, незаделени за спестявания",
+        ["not backed by cash"] = "непокрити с налични пари",
         ["Category & fund"] = "Категория и сметка",
         ["Contributions"] = "Вноски",
         ["Add expense"] = "Добави разход",
