@@ -1,6 +1,17 @@
 # FinApp — session handoff
 
 Last updated: 2026-06-24. Read this + [README.md](README.md) + recent `git log` to catch up.
+
+## Tech-debt cleanup (2026-06-24, on `main`)
+`feature/account-tab-changes` was **merged + pushed to `origin/main`** (GitHub shonzi91/FinApp). Debt status:
+- ✅ **Deploy cache-busting:** `FinApp.Server` now serves the hash-less entry files
+  (`FinApp.App.Web.styles.css`, `index.html`, SPA fallback) with `Cache-Control: no-cache, must-revalidate`,
+  so a new deploy is picked up without a manual hard-refresh (fingerprinted `_framework`/`_content` stay cached).
+- ✅ **Localization:** all 43 modal action buttons + 21 modal titles wrapped in `@Loc[...]` with BG strings.
+  Remaining EN-only tail = deep modal hints/labels + some `title=` tooltips (smaller follow-up).
+- ⏳ **Rotate the exposed Neon password — STILL OPEN, needs the user.** No Neon CLI here. Steps: Neon dashboard →
+  Roles → reset the role password → copy the new `postgres://` URI → update Cloud Run env `ConnectionStrings__FinApp`
+  (ideally move it to Secret Manager) → redeploy. The leaked value stays valid until this is done.
 NOTE on working style (see memory): this user prefers I **proceed with sensible defaults rather than ask** — don't gate work behind clarifying questions; state assumptions and move.
 
 ## Session 9 (2026-06-24) — Account-tab cleanup (branch `feature/account-tab-changes`, commit 6397a29)
