@@ -77,10 +77,9 @@ else
             <button class="nav" title="Next period" @onclick="State.GoNext" disabled="@(!State.CanGoNext)">▶</button>
         </div>
         <div class="head-right">
-            <span class="status">@Loc[State.Period.Status.ToString()]</span>
+            <span class="status">@Loc[State.IsPeriodOpen ? "Active" : "Closed"]</span>
             <div class="balances">
                 <span class="bal" title="Sum of the period's opening fund values"><span class="bal-label">@Loc["Opening"]</span> <strong>@Fmt(State.OpeningBalance)</strong></span>
-                <span class="bal" title="Money expected to carry into the next period"><span class="bal-label">@Loc["Closing"]</span> <strong>@Fmt(State.ClosingBalance)</strong></span>
             </div>
         </div>
     </header>
@@ -103,7 +102,7 @@ else
     {
         case Tab.Account:
             <section class="cards">
-                <div class="card"><span class="card-label">@Loc["Contributed"]</span><span class="card-value">@Fmt(State.TotalContributed)</span></div>
+                <div class="card"><span class="card-label">@Loc[State.IsPeriodOpen ? "Current" : "Closed on"]</span><span class="card-value">@Fmt(State.TotalContributed)</span></div>
                 <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
                 <div class="card"><span class="card-label">@Loc["Budgeted"]</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
                 <div class="card savings">
@@ -249,10 +248,6 @@ else
                         <p class="hint warn-text">@Fmt(State.UnallocatedShortfall) still unallocated — add deposits (which offset it automatically), or cover it from a savings bucket on the Savings tab.</p>
                     }
                 }
-                @if (State.HasUnallocatedFunds)
-                {
-                    <p class="hint warn-text">@Fmt(State.Unallocated) is contributed but not yet allocated. Assign it to a budget or savings before recording more deposits.</p>
-                }
 
                 @if (State.IsPeriodOpen)
                 {
@@ -271,7 +266,7 @@ else
                         </select>
                         <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_depAmount" />
                         <input type="date" @bind="_depDate" min="@State.Period.From.ToString("yyyy-MM-dd")" max="@State.Period.To.ToString("yyyy-MM-dd")" />
-                        <button @onclick="RecordDeposit" disabled="@(_depAmount <= 0 || State.HasUnallocatedFunds)" title="@(State.HasUnallocatedFunds ? "Allocate existing funds first" : null)">@Loc["Deposit"]</button>
+                        <button @onclick="RecordDeposit" disabled="@(_depAmount <= 0)">@Loc["Deposit"]</button>
                     </div>
                     <div class="contrib-cats">
                         <span class="hint">@Loc["Categories"]:</span>
@@ -308,29 +303,6 @@ else
                 </ul>
             </section>
 
-            <section class="panel">
-                <h2>@Loc["Recent expenses"]</h2>
-                <ul class="list">
-                    @foreach (var e in State.RecentExpenses)
-                    {
-                        <li>
-                            <span>@e.Date.ToString("dd MMM") · @State.CategoryName(e.CategoryId)@(e.IsFromSavings ? " · 💰saving" : "")@(string.IsNullOrEmpty(e.Note) ? "" : $" · {e.Note}")</span>
-                            <span class="row-actions">
-                                <span class="amt">@Fmt(e.Amount)</span>
-                                @if (State.IsPeriodOpen)
-                                {
-                                    <button class="exp-edit" title="Edit expense" @onclick="() => OpenEditExpense(e.Id)">✏️</button>
-                                    <button class="exp-edit" title="Remove expense" @onclick="() => OpenDeleteExpense(e.Id)">🗑️</button>
-                                }
-                            </span>
-                        </li>
-                    }
-                    @if (!State.RecentExpenses.Any())
-                    {
-                        <li><em>@Loc["No expenses yet."]</em></li>
-                    }
-                </ul>
-            </section>
             break;
 
         case Tab.Budgets:
@@ -482,7 +454,7 @@ else
                         <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_savingAmount" />
                         <button title="Add to savings" @onclick="AllocateSaving" disabled="@(_savingAmount <= 0 || _savingAmount > State.MaxAdditionalSavings.Amount)">💰</button>
                     </div>
-                    <small class="hint">Available to save: <strong>@Fmt(State.MaxAdditionalSavings)</strong> (contributed − budgeted).</small>
+                    <small class="hint">Available to save: <strong>@Fmt(State.MaxAdditionalSavings)</strong> (current − budgeted).</small>
                     @if (State.SavingDepositsThisPeriod.Any())
                     {
                         <ul class="list">
@@ -505,7 +477,7 @@ else
                 </section>
 
                 <section class="panel">
-                    <h2>@Loc["Spend savings"]</h2>
+                    <h2>@Loc["Budget savings"]</h2>
                     <div class="form spend-form">
                         <select @bind="_spendBucketId">
                             @foreach (var (bucket, _) in State.SavingBuckets)
@@ -566,7 +538,7 @@ else
                 </section>
 
                 <section class="panel">
-                    <h2>@Loc["Spend as expense"]</h2>
+                    <h2>@Loc["Spend savings"]</h2>
                     <div class="form spend-form">
                         <select @bind="_spendExpBucketId">
                             @foreach (var (bucket, _) in State.SavingBuckets)
@@ -582,7 +554,7 @@ else
                             }
                         </select>
                         <input type="number" step="0.01" min="0" placeholder="@Loc["Amount"]" @bind="_spendExpAmount" />
-                        <button title="@Loc["Spend as expense"]" @onclick="SpendBucketAsExpense" disabled="@(_spendExpAmount <= 0 || _spendExpCategoryId == Guid.Empty)">💸</button>
+                        <button title="@Loc["Spend savings"]" @onclick="SpendBucketAsExpense" disabled="@(_spendExpAmount <= 0 || _spendExpCategoryId == Guid.Empty)">💸</button>
                     </div>
                     <small class="hint">@Loc["Records a real expense paid straight from this bucket (dated today)."]</small>
                 </section>

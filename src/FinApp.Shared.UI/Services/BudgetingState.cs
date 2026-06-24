@@ -277,17 +277,12 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     /// <summary>The "From previous period" carryover contribution for this period (0 if none).</summary>
     public Money CarryoverThisPeriod => Period.CarryoverTotal;
 
-    public IReadOnlyList<Expense> RecentExpenses =>
-        Period.Expenses.OrderByDescending(e => e.Date).Take(10).ToList();
-
     public IReadOnlyList<Expense> AllExpenses =>
         Period.Expenses.OrderByDescending(e => e.Date).ToList();
 
     public IReadOnlyList<Expense> ExpensesFor(Guid categoryId) =>
         Period.Expenses.Where(e => e.CategoryId == categoryId).OrderByDescending(e => e.Date).ToList();
 
-    public Money Unallocated => MaxAdditionalSavings;
-    public bool HasUnallocatedFunds => Unallocated.Amount > 0m;
     public bool IsPeriodOpen => Period.Status == PeriodStatus.Open;
 
     public Expense? FindExpense(Guid id) => Period.Expenses.FirstOrDefault(e => e.Id == id);

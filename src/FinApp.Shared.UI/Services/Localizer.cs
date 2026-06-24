@@ -90,27 +90,26 @@ public sealed class Localizer(IJSRuntime js)
         ["Savings"] = "Спестявания",
 
         // Account-tab cards + balances
-        ["Contributed"] = "Внесено",
+        ["Current"] = "Текущо",
+        ["Closed on"] = "Затворено с",
         ["Spent"] = "Похарчено",
         ["Budgeted"] = "Бюджетирано",
         ["Saved this period"] = "Спестено този период",
         ["of contributions"] = "от вноските",
         ["Opening"] = "Начално",
-        ["Closing"] = "Крайно",
-        ["Open"] = "Отворен",
+        ["Active"] = "Активен",
         ["Closed"] = "Затворен",
         ["shared"] = "споделен",
 
         // Panels / headings
         ["Funds"] = "Сметки",
         ["Contributions"] = "Вноски",
-        ["Recent expenses"] = "Скорошни разходи",
         ["Add expense"] = "Добави разход",
         ["All expenses"] = "Всички разходи",
         ["Savings buckets"] = "Спестовни каси",
         ["Add to savings"] = "Добави към спестявания",
-        ["Spend savings"] = "Изразходвай спестявания",
-        ["Spend as expense"] = "Похарчи като разход",
+        ["Budget savings"] = "Бюджетирай спестявания",
+        ["Spend savings"] = "Похарчи спестявания",
         ["Records a real expense paid straight from this bucket (dated today)."] =
             "Записва реален разход, платен директно от тази каса (с днешна дата).",
         ["From previous period"] = "От предишен период",
