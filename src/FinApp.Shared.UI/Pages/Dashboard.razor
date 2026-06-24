@@ -147,7 +147,17 @@ else
                                     <span class="row-note">· @note</span>
                                 }
                             </span>
-                            <span class="amt">@Fmt(State.FundBalance(f.Id))</span>
+                            <span class="row-ops">
+                                <span class="amt">@Fmt(State.FundBalance(f.Id))</span>
+                                @if (State.IsPeriodOpen)
+                                {
+                                    @if (CanTransfer)
+                                    {
+                                        <button class="exp-edit" title="@Loc["Transfer from this fund"]" @onclick="() => OpenTransferFromFund(f.Id)">🔁</button>
+                                    }
+                                    <button class="exp-edit" title="@Loc["Deposit to this fund"]" @onclick="() => OpenDepositToFund(f.Id)">➕</button>
+                                }
+                            </span>
                         </li>
                     }
                     @if (!State.RootFunds.Any())
@@ -641,6 +651,38 @@ else
                     </div>
                     break;
 
+                case Modal.Transfer:
+                    <h3>@Loc["Transfer from"] @State.FundName(_mTransferFromId)</h3>
+                    <label>@Loc["To"]
+                        <select @bind="_mTransferDestId">
+                            <optgroup label="@Loc["Funds"]">
+                                @foreach (var f in State.RootFunds.Where(f => f.Id != _mTransferFromId))
+                                {
+                                    <option value="@f.Id">@f.Name</option>
+                                }
+                            </optgroup>
+                            @if (State.TransferableAccounts.Any())
+                            {
+                                <optgroup label="@Loc["Other accounts"]">
+                                    @foreach (var a in State.TransferableAccounts)
+                                    {
+                                        <option value="@a.Id">📤 @a.Name</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                    </label>
+                    <label>@Loc["Amount"] <input type="number" step="0.01" min="0" @bind="_mTransferAmount" /></label>
+                    @if (MTransferDestIsAccount)
+                    {
+                        <small class="hint">@Loc["Available to send:"] <strong>@Fmt(State.AvailableToTransferOut)</strong> (@Loc["cash not earmarked for savings"]).</small>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
+                        <button @onclick="ConfirmTransfer" disabled="@(_mTransferAmount <= 0 || _mTransferDestId == Guid.Empty || _mTransferDestId == _mTransferFromId || (MTransferDestIsAccount && _mTransferAmount > State.AvailableToTransferOut.Amount))">🔁 @Loc["Transfer money"]</button>
+                    </div>
+                    break;
+
                 case Modal.Deposit:
                     <h3>@Loc["Add a deposit"]</h3>
                     <label>@Loc["Category"]
@@ -993,7 +1035,7 @@ else
 }
 
 @code {
-    private enum Modal { None, AddCat, EditCat, DeleteCat, AddAccount, EditAccount, DeleteAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, Deposit, EditDeposit, DeleteDeposit, ManageContribCats, ContribCat, DeleteContribCat, AddSaving, BudgetSaving, SpendSaving, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
+    private enum Modal { None, AddCat, EditCat, DeleteCat, AddAccount, EditAccount, DeleteAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, Transfer, Deposit, EditDeposit, DeleteDeposit, ManageContribCats, ContribCat, DeleteContribCat, AddSaving, BudgetSaving, SpendSaving, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
     private enum Tab { Account, Budgets, Expenses, Savings }
 
     private Tab _tab = Tab.Account;
@@ -1008,6 +1050,11 @@ else
     private Guid _transferFromId;
     private Guid _transferDestId;   // a fund or another account
     private decimal _transferAmount;
+
+    // Per-fund "Transfer from" popup (separate from the inline transfer panel).
+    private Guid _mTransferFromId;
+    private Guid _mTransferDestId;
+    private decimal _mTransferAmount;
 
     private Guid _editTransferId;
     private Guid _editTransferFromId;
@@ -1521,6 +1568,38 @@ else
             await State.TransferFunds(_transferFromId, _transferDestId, _transferAmount, null);
         _transferAmount = 0;
     });
+
+    // --- Per-fund operation popups ----------------------------------------
+
+    private void OpenTransferFromFund(Guid fundId)
+    {
+        _mTransferFromId = fundId;
+        _mTransferDestId = State.RootFunds.FirstOrDefault(f => f.Id != fundId)?.Id
+            ?? State.TransferableAccounts.FirstOrDefault()?.Id ?? Guid.Empty;
+        _mTransferAmount = 0;
+        _modal = Modal.Transfer;
+    }
+
+    private bool MTransferDestIsAccount => State.TransferableAccounts.Any(a => a.Id == _mTransferDestId);
+
+    private Task ConfirmTransfer() => RunModal(async () =>
+    {
+        if (_mTransferAmount <= 0 || _mTransferDestId == Guid.Empty || _mTransferDestId == _mTransferFromId) return;
+        if (MTransferDestIsAccount)
+            await State.TransferToAccount(_mTransferDestId, _mTransferFromId, _mTransferAmount, null);
+        else
+            await State.TransferFunds(_mTransferFromId, _mTransferDestId, _mTransferAmount, null);
+        CloseModal();
+    });
+
+    private void OpenDepositToFund(Guid fundId)
+    {
+        _depCategoryId = State.ContributionCategories.FirstOrDefault()?.Id ?? Guid.Empty;
+        _depFundId = fundId;
+        _depAmount = 0;
+        _depDate = DateOnly.FromDateTime(DateTime.Today);
+        _modal = Modal.Deposit;
+    }
 
     private void OpenEditTransfer(Guid id)
     {
