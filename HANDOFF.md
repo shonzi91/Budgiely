@@ -9,9 +9,15 @@ Last updated: 2026-06-24. Read this + [README.md](README.md) + recent `git log` 
   so a new deploy is picked up without a manual hard-refresh (fingerprinted `_framework`/`_content` stay cached).
 - ✅ **Localization:** all 43 modal action buttons + 21 modal titles wrapped in `@Loc[...]` with BG strings.
   Remaining EN-only tail = deep modal hints/labels + some `title=` tooltips (smaller follow-up).
-- ⏳ **Rotate the exposed Neon password — STILL OPEN, needs the user.** No Neon CLI here. Steps: Neon dashboard →
-  Roles → reset the role password → copy the new `postgres://` URI → update Cloud Run env `ConnectionStrings__FinApp`
-  (ideally move it to Secret Manager) → redeploy. The leaked value stays valid until this is done.
+- ✅ **Neon password rotated + moved to Secret Manager.** The user reset the Neon role password. The connection
+  string now lives in **GCP Secret Manager** secret `finapp-db` (project `finapp-1111`); Cloud Run reads it via
+  `--set-secrets=ConnectionStrings__FinApp=finapp-db:latest` and the **plaintext env var was removed**. The runtime
+  SA `85638328674-compute@developer.gserviceaccount.com` has `secretAccessor`. Old secret version 1 (leaked value)
+  is **disabled**. Live on **finapp-00013** (startup `EnsureCreated()` succeeded → DB auth OK).
+  - To rotate again: add a new secret version (`gcloud secrets versions add finapp-db --data-file=- --project
+    finapp-1111`), then `gcloud run services update finapp --region europe-west1 --set-secrets=
+    ConnectionStrings__FinApp=finapp-db:latest`. `gcloud run deploy --source .` keeps the secret binding (reuses config).
+  - **Still plaintext env vars:** `Jwt__Key` (the JWT signing key) could get the same Secret Manager treatment next.
 NOTE on working style (see memory): this user prefers I **proceed with sensible defaults rather than ask** — don't gate work behind clarifying questions; state assumptions and move.
 
 ## Session 9 (2026-06-24) — Account-tab cleanup (branch `feature/account-tab-changes`, commit 6397a29)
