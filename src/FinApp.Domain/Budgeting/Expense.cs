@@ -20,6 +20,13 @@ public sealed class Expense : Entity
     public string? Note { get; }
     public Guid? SourceSavingCategoryId { get; }
 
+    /// <summary>
+    /// When true, this expense was paid here but is (partly or wholly) on behalf of another account, so it can
+    /// later be settled — the user pushes a chosen amount of it onto another account as that account's expense,
+    /// and this account records a matching reimbursement deposit. Purely a flag that surfaces the "settle" action.
+    /// </summary>
+    public bool OnBehalfOfOtherAccount { get; }
+
     public Expense(
         Guid categoryId,
         Money amount,
@@ -27,7 +34,8 @@ public sealed class Expense : Entity
         Guid memberId,
         Guid fundId,
         string? note = null,
-        Guid? sourceSavingCategoryId = null)
+        Guid? sourceSavingCategoryId = null,
+        bool onBehalfOfOtherAccount = false)
     {
         if (amount.IsNegative)
             throw new ArgumentException("Expense amount cannot be negative.", nameof(amount));
@@ -38,6 +46,7 @@ public sealed class Expense : Entity
         FundId = fundId;
         Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         SourceSavingCategoryId = sourceSavingCategoryId;
+        OnBehalfOfOtherAccount = onBehalfOfOtherAccount;
     }
 
     public bool IsFromSavings => SourceSavingCategoryId is not null;

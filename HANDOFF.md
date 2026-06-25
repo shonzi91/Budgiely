@@ -1,9 +1,45 @@
 # Budgiely (FinApp) — session handoff
 
-Last updated: 2026-06-25. Read this + [README.md](README.md) + recent `git log` to catch up.
+Last updated: 2026-06-25 (Session 11). Read this + [README.md](README.md) + recent `git log` to catch up.
 Product is now branded **Budgiely** 🐤 ("Budget like a budgie."); **code namespaces/assemblies stay `FinApp.*`**
 (product name ≠ assembly name — not worth a full rename). Live on Cloud Run, all on `origin/main` (GitHub
 shonzi91/FinApp — **repo not yet renamed to Budgiely**; user to do it in Settings, then repoint the remote).
+
+## Session 11 (2026-06-25) — 8 UX/feature requests (on `main`, all 101 tests green)
+Eight items from live use. **101 tests pass** (77 domain + 5 persistence + 19 server; +1 new domain test for #8).
+New EF migration **`AddExpenseOnBehalfOfOtherAccount`** (single bool column; applies on start via `Migrate()`).
+1. **Expense "on behalf of another account" + settle later.** New **persisted** flag `Expense.OnBehalfOfOtherAccount`
+   (ctor param, `ExpenseNode` field default `false`, EF `Property` + migration, preserved through `Period.EditExpense`).
+   Add-expense modal has a checkbox; flagged rows show a 🤝 button by the amount → **Settle modal** (amount + dest
+   account + note). `BudgetingState.SettleExpenseToAccount`: records the amount as an **expense in the dest account**
+   (its first category/fund, note "From {thisAccount}") **and** a matching **reimbursement deposit** back here (into the
+   expense's fund, under an auto-created "Reimbursement" contribution category via `FindOrCreateContributionCategory`).
+   Net: this account's cost drops by the settled amount, the other account bears it, original expense stays as the record.
+   **Decision (told the user):** modeled as "the other account incurs it + reimburses you" using existing deposit/expense
+   primitives — *not* a reduce-and-reattribute. Flip if wrong.
+2. **Fund shown on expense rows** — Expenses-tab row reads `Category · Fund · 💰saving · 🤝 on behalf · note`.
+3. **Icon on savings-activity movements** — movement rows get a leading ➡️ (move-to-budget) / 🔁 (bucket transfer) via
+   `MovementIcon(SavingAllocation)`, matching the 💰 on deposit rows.
+4. **Destination-fund picker on cross-account transfers** — both the inline "Transfer money" form and the per-fund
+   Transfer modal lazy-load the dest account's funds (`BudgetingState.LoadAccountFundsAsync`, cached in `_destFunds`) and
+   show a fund `<select>` when the target is another account. `TransferToAccount(..., Guid destinationFundId = default)`
+   deposits into the chosen fund (`ResolveDestinationFund` falls back to first). `@bind:after` handlers load on dest change.
+5. **Cache invalidation on between-account ops** — `TransferToAccount` + `SettleExpenseToAccount` now
+   `_cache.Remove(destinationAccountId)` so switching to that account refetches from the DB (our own SignalR
+   `AccountChanged` is ignored, so the dest entry would otherwise stay stale).
+6. **Expenses tab defaults to today** — `ShowExpensesTab()` sets `_dayView` to today (clamped to the period); `ResetPickers`
+   now **preserves** `_dayView` (re-clamps instead of nulling); `AddExpenseFromModal` sets `_dayView = _expenseDate` so it
+   stays on the day just used. Tab button + phone-init both call `ShowExpensesTab`.
+7. **Header restructured** — account dropdown moved to its own `.acct-bar` row, **out** of the arrow-flanked
+   `.period-nav`; `.acct-select` restyled as a gradient pill with a custom `▾` caret (`.acct-picker::after`).
+8. **Budget adjustment on copy-forward** — Start-next-month has an "Adjust budgets to this period's spending" checkbox
+   (default on when copying). `Account.StartPeriod(..., bool adjustToConsumption)` → `AdjustToConsumption`:
+   `⌈((budgeted + spent)/2)/10⌉ × 10` (halfway to actual spend, rounded **up** to the next 10). e.g. 400/470→440, 250/100→180.
+   Threaded via `BudgetingState.StartNextPeriod(copyBudgets, openings, adjustBudgets)`.
+**Files:** `Domain/Budgeting/Expense.cs`, `Domain/Periods/Period.cs`, `Domain/Accounts/Account.cs`,
+`Contracts/AccountSnapshotSerializer.cs`, `Persistence/FinAppDbContext.cs` + new migration, `Shared.UI/Services/BudgetingState.cs`,
+`Shared.UI/Pages/Dashboard.razor`(+`.css`), `Shared.UI/Services/Localizer.cs` (BG strings), `Domain.Tests/AccountPeriodTests.cs`.
+**Not yet deployed** — redeploy with `gcloud run deploy finapp --source . --region europe-west1` when ready.
 
 ## Session 10 (2026-06-25) — branding, polish, data import, perf
 All on `main`, deployed (latest revision ~finapp-00021). Highlights since the 06-24 debt cleanup:

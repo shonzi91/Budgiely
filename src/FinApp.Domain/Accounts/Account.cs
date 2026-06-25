@@ -412,7 +412,7 @@ public sealed class Account : Entity
     /// settings forward (feature 5). Carry-over of opening balances and reconciliation are handled
     /// by the application/reconciliation services, not here, to keep this aggregate pure.
     /// </summary>
-    public Period StartPeriod(DateOnly from, DateOnly to, bool copyBudgetsFromPrevious = false)
+    public Period StartPeriod(DateOnly from, DateOnly to, bool copyBudgetsFromPrevious = false, bool adjustToConsumption = false)
     {
         var previous = CurrentPeriod;
         if (previous is not null && from <= previous.From)
@@ -423,10 +423,31 @@ public sealed class Account : Entity
         if (copyBudgetsFromPrevious && previous is not null)
         {
             foreach (var b in previous.Budgets)
-                period.AddBudget(b.CategoryId, b.Allocated, b.AlertThreshold, b.NotifyOnEveryExpense);
+            {
+                var allocated = adjustToConsumption
+                    ? AdjustToConsumption(b.Allocated, SpentInCategory(previous, b.CategoryId))
+                    : b.Allocated;
+                period.AddBudget(b.CategoryId, allocated, b.AlertThreshold, b.NotifyOnEveryExpense);
+            }
         }
 
         _periods.Add(period);
         return period;
+    }
+
+    private static Money SpentInCategory(Period period, Guid categoryId) =>
+        period.Expenses.Where(e => e.CategoryId == categoryId)
+            .Aggregate(Money.Zero(period.Currency), (acc, e) => acc + e.Amount);
+
+    /// <summary>
+    /// Nudge a copied-forward budget halfway toward what was actually spent, then round the result up to the next
+    /// whole 10. Overspending raises the budget by half the overspend; underspending lowers it by half the slack.
+    /// Equivalent to ⌈((budgeted + spent) / 2) / 10⌉ × 10. (Feature 8.)
+    /// </summary>
+    private static Money AdjustToConsumption(Money budgeted, Money spent)
+    {
+        var midpoint = (budgeted.Amount + spent.Amount) / 2m;
+        var roundedUpToTen = Math.Ceiling(midpoint / 10m) * 10m;
+        return new Money(roundedUpToTen < 0m ? 0m : roundedUpToTen, budgeted.Currency);
     }
 }

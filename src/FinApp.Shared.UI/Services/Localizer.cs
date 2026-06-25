@@ -225,5 +225,18 @@ public sealed class Localizer(IJSRuntime js)
         ["Delete"] = "Изтрий",
         ["Remove"] = "Премахни",
         ["Close"] = "Затвори",
+
+        // Session 11 features
+        ["On behalf of another account (settle later)"] = "От името на друг профил (уреди по-късно)",
+        ["Settle onto another account"] = "Прехвърли към друг профил",
+        ["Settle"] = "Прехвърли",
+        ["Records this amount as an expense on the chosen account, and a matching reimbursement deposit here."] =
+            "Записва тази сума като разход в избрания профил и съответстващ възстановяващ депозит тук.",
+        ["You have no other same-currency account to settle onto."] =
+            "Нямаш друг профил в същата валута, към който да прехвърлиш.",
+        ["Destination fund"] = "Целеви фонд",
+        ["Adjust budgets to this period’s spending"] = "Коригирай бюджетите спрямо разходите за този период",
+        ["Each budget moves halfway toward what was actually spent, rounded up to the nearest 10."] =
+            "Всеки бюджет се приближава наполовина към реално похарченото, закръглено нагоре до 10.",
     };
 }

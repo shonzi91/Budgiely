@@ -33,6 +33,30 @@ public class AccountPeriodTests
     }
 
     [Fact]
+    public void Copying_budgets_forward_can_adjust_to_previous_consumption()
+    {
+        var account = new Account("Family", Eur);
+        var food = account.AddCategory("Food");
+        var bills = account.AddCategory("Bills");
+        var fund = Guid.NewGuid();
+        var member = Guid.NewGuid();
+
+        var jan = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        jan.AddBudget(food.Id, M(400));
+        jan.AddBudget(bills.Id, M(250));
+        jan.AddExpense(new Expense(food.Id, M(470), new DateOnly(2026, 1, 10), member, fund));  // overspent
+        jan.AddExpense(new Expense(bills.Id, M(100), new DateOnly(2026, 1, 12), member, fund)); // underspent
+
+        var feb = account.StartPeriod(new DateOnly(2026, 2, 1), new DateOnly(2026, 2, 28),
+            copyBudgetsFromPrevious: true, adjustToConsumption: true);
+
+        // Overspent: halfway from 400 to 470 is 435, rounded up to the next 10 -> 440.
+        Assert.Equal(M(440), feb.FindBudget(food.Id)!.Allocated);
+        // Underspent: halfway from 250 to 100 is 175, rounded up to the next 10 -> 180.
+        Assert.Equal(M(180), feb.FindBudget(bills.Id)!.Allocated);
+    }
+
+    [Fact]
     public void Duplicate_member_is_rejected()
     {
         var account = new Account("Shared", Eur);

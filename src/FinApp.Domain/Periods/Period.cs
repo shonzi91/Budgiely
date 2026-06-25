@@ -351,7 +351,8 @@ public sealed class Period : Entity
         RemoveExpense(expenseId);
         return old.SourceSavingCategoryId is { } savingId
             ? ConvertSavingToExpense(savingId, categoryId, amount, date, old.MemberId, fundId, note)
-            : AddExpense(new Expense(categoryId, amount, date, old.MemberId, fundId, note));
+            : AddExpense(new Expense(categoryId, amount, date, old.MemberId, fundId, note,
+                onBehalfOfOtherAccount: old.OnBehalfOfOtherAccount));
     }
 
     public Money ExpensesTotal => Sum(_expenses.Select(e => e.Amount));

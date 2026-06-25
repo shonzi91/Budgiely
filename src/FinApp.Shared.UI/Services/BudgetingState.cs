@@ -388,9 +388,10 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
 
     // --- Commands ---------------------------------------------------------
 
-    public Task AddExpense(Guid categoryId, decimal amount, Guid fundId, string? note, DateOnly date)
+    public Task AddExpense(Guid categoryId, decimal amount, Guid fundId, string? note, DateOnly date, bool onBehalfOfOtherAccount = false)
     {
-        Period.AddExpense(new Expense(categoryId, Money(amount), date, CurrentMemberId, fundId, note));
+        Period.AddExpense(new Expense(categoryId, Money(amount), date, CurrentMemberId, fundId, note,
+            onBehalfOfOtherAccount: onBehalfOfOtherAccount));
         return SaveAsync();
     }
 
@@ -595,12 +596,23 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     public ExternalTransfer? FindExternalTransfer(Guid id) =>
         Period.ExternalTransfers.FirstOrDefault(t => t.Id == id);
 
+    /// <summary>The (root) funds of another account, for picking a transfer/settlement destination fund. Uses the
+    /// warm cache when available, else fetches and deserializes the snapshot (read-only — not cached here).</summary>
+    public async Task<IReadOnlyList<Fund>> LoadAccountFundsAsync(Guid accountId)
+    {
+        if (accountId == Guid.Empty) return [];
+        if (_cache.TryGetValue(accountId, out var hit)) return hit.Account.RootFunds.ToList();
+        var snapshot = await api.GetSnapshotAsync(accountId);
+        if (string.IsNullOrEmpty(snapshot.Payload)) return [];
+        return AccountSnapshotSerializer.Deserialize(snapshot.Payload).RootFunds.ToList();
+    }
+
     /// <summary>
     /// Send money from one of this account's funds to another account. The source records a real outflow
     /// (lowering the fund and the closing balance); the destination's current period receives it as a deposit
-    /// from the signed-in user. Two snapshots are pushed — this account's, then the destination's.
+    /// from the signed-in user into the chosen fund. Two snapshots are pushed — this account's, then the destination's.
     /// </summary>
-    public async Task TransferToAccount(Guid destinationAccountId, Guid fromFundId, decimal amount, string? note)
+    public async Task TransferToAccount(Guid destinationAccountId, Guid fromFundId, decimal amount, string? note, Guid destinationFundId = default)
     {
         if (amount <= 0m) return;
         var destination = _summaries.FirstOrDefault(a => a.Id == destinationAccountId)
@@ -620,9 +632,62 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         var destPeriod = destAccount.CurrentPeriod
             ?? throw new InvalidOperationException($"“{destination.Name}” has no open period to receive the transfer.");
         destPeriod.Deposit(auth.UserId, new Money(amount, destAccount.Currency),
-            fundId: destAccount.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty, date: Today());
+            fundId: ResolveDestinationFund(destAccount, destinationFundId), date: Today());
         var payload = AccountSnapshotSerializer.Serialize(destAccount);
         await api.SaveSnapshotAsync(destinationAccountId, new SaveAccountRequest(payload, snapshot.Version));
+        _cache.Remove(destinationAccountId); // its snapshot changed under us — drop so a switch refetches (feature 5)
+    }
+
+    /// <summary>Settle part (or all) of an "on behalf of another account" expense onto another account: that
+    /// account records the chosen amount as its own expense, and this account records a matching reimbursement
+    /// deposit (into the original expense's fund) so its net cost drops by the settled amount. The original
+    /// expense stays intact as the record of what was bought. (Feature 1.)</summary>
+    public async Task SettleExpenseToAccount(Guid expenseId, Guid destinationAccountId, decimal amount, string? note)
+    {
+        if (amount <= 0m) return;
+        var expense = Period.Expenses.FirstOrDefault(e => e.Id == expenseId)
+            ?? throw new InvalidOperationException("Expense not found in this period.");
+        var destination = _summaries.FirstOrDefault(a => a.Id == destinationAccountId)
+            ?? throw new InvalidOperationException("Destination account not found.");
+        if (destination.Currency != Currency)
+            throw new InvalidOperationException("Both accounts must use the same currency.");
+
+        // 1) Build the destination expense first, so a missing period/category/fund fails before we touch this account.
+        var snapshot = await api.GetSnapshotAsync(destinationAccountId);
+        if (string.IsNullOrEmpty(snapshot.Payload))
+            throw new InvalidOperationException($"Open “{destination.Name}” once before settling onto it.");
+        var destAccount = AccountSnapshotSerializer.Deserialize(snapshot.Payload);
+        var destPeriod = destAccount.CurrentPeriod
+            ?? throw new InvalidOperationException($"“{destination.Name}” has no open period to receive the expense.");
+        var destCategory = destAccount.RootCategories.FirstOrDefault()
+            ?? throw new InvalidOperationException($"“{destination.Name}” has no category to record the expense against.");
+        var settleNote = $"From {Account.Name}" + (string.IsNullOrWhiteSpace(note) ? "" : $": {note}");
+        destPeriod.AddExpense(new Expense(destCategory.Id, new Money(amount, destAccount.Currency), Today(),
+            auth.UserId, destAccount.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty, settleNote));
+
+        // 2) Record the reimbursement into this account (cash restored for the settled portion) and push it.
+        var reimbursementCategoryId = FindOrCreateContributionCategory("Reimbursement");
+        Period.Deposit(CurrentMemberId, Money(amount), reimbursementCategoryId, expense.FundId, Today());
+        await SaveAsync();
+
+        // 3) Push the destination's new expense.
+        var payload = AccountSnapshotSerializer.Serialize(destAccount);
+        await api.SaveSnapshotAsync(destinationAccountId, new SaveAccountRequest(payload, snapshot.Version));
+        _cache.Remove(destinationAccountId); // refetch on next switch (feature 5)
+    }
+
+    private static Guid ResolveDestinationFund(Account destAccount, Guid requestedFundId)
+    {
+        if (requestedFundId != Guid.Empty && destAccount.RootFunds.Any(f => f.Id == requestedFundId))
+            return requestedFundId;
+        return destAccount.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
+    }
+
+    private Guid FindOrCreateContributionCategory(string name)
+    {
+        var existing = Account.ContributionCategories
+            .FirstOrDefault(c => string.Equals(c.Name.Trim(), name, StringComparison.OrdinalIgnoreCase));
+        return existing?.Id ?? Account.AddContributionCategory(name).Id;
     }
 
     public Task RemoveExternalTransfer(Guid id)
@@ -683,14 +748,14 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     /// new period's opening balance. That carried money is immediately allocatable (opening balances count toward
     /// what you can budget/save), so there's no separate carryover entry — what you actually have is what you have.
     /// </summary>
-    public Task StartNextPeriod(bool copyBudgets, IReadOnlyDictionary<Guid, decimal> realFundOpenings)
+    public Task StartNextPeriod(bool copyBudgets, IReadOnlyDictionary<Guid, decimal> realFundOpenings, bool adjustBudgets = false)
     {
         var previous = Account.CurrentPeriod!;
         previous.Close();
 
         var from = previous.To.AddDays(1);
         var to = from.AddMonths(1).AddDays(-1);
-        var next = Account.StartPeriod(from, to, copyBudgets);
+        var next = Account.StartPeriod(from, to, copyBudgets, adjustBudgets && copyBudgets);
 
         foreach (var f in Account.RootFunds)
         {

@@ -229,6 +229,7 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             e.Property(x => x.FundId);
             e.Property(x => x.Note);
             e.Property(x => x.SourceSavingCategoryId);
+            e.Property(x => x.OnBehalfOfOtherAccount);
             e.Ignore(x => x.IsFromSavings);
         });
 
