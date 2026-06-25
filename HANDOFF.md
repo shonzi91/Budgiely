@@ -1,6 +1,47 @@
-# FinApp — session handoff
+# Budgiely (FinApp) — session handoff
 
-Last updated: 2026-06-24. Read this + [README.md](README.md) + recent `git log` to catch up.
+Last updated: 2026-06-25. Read this + [README.md](README.md) + recent `git log` to catch up.
+Product is now branded **Budgiely** 🐤 ("Budget like a budgie."); **code namespaces/assemblies stay `FinApp.*`**
+(product name ≠ assembly name — not worth a full rename). Live on Cloud Run, all on `origin/main` (GitHub
+shonzi91/FinApp — **repo not yet renamed to Budgiely**; user to do it in Settings, then repoint the remote).
+
+## Session 10 (2026-06-25) — branding, polish, data import, perf
+All on `main`, deployed (latest revision ~finapp-00021). Highlights since the 06-24 debt cleanup:
+- **Rebrand → Budgiely:** `BudgieLogo.razor` (SVG budgie with a €-coin belly) in the app bar + sign-in screen;
+  name/title/`<title>`/README/first-run all say Budgiely; SVG `favicon.svg`; tagline "Budget like a budgie." (EN/BG).
+  **Empty-state mascot** (bobbing budgie on first-run, respects `prefers-reduced-motion`) + **bird-themed microcopy**
+  on the empty states + overspend banner.
+- **Fancier invitations panel:** `InvitationsPanel.razor.css` (it had **no** scoped CSS before, so it rendered
+  unstyled — its `.panel`/`.list` belonged to Dashboard's scope). Framed gradient card, avatars, gradient Accept.
+- **Modal centering fix (important gotcha):** the app loads **Bootstrap**, whose `.modal`/`.modal-backdrop`
+  collide with ours; Bootstrap leaked `position:fixed;top;left;height:100%` onto our box. Fixed by overriding on
+  scoped `.modal` — but **the scoped-CSS minifier strips declarations whose value is the CSS default**, so the
+  first try (`position:static`/`height:auto`) vanished from the published bundle. Final fix uses **non-default**
+  `position:relative; height:fit-content`. (If you ever override a leaked default again, use a non-default value.)
+- **Profile / change password:** click the username in the app bar → modal. New `POST /auth/password` (authorized)
+  + `AuthService.ChangePasswordAsync` + client `ChangePasswordAsync`.
+- **Account-switch cache:** `BudgetingState` caches the deserialized aggregate per account (instant switching, no
+  re-fetch); subscribes to **all** accounts so `AccountChanged` invalidates; only trusted while `sync.IsConnected`;
+  reconnect clears it. `SyncClient` gained `IsConnected` + `Reconnected`.
+- **Responsive pass** (header stacks, tabs scroll, cards reflow, forms wrap, budget tree grid drops the bar on
+  phones). **Budgets tab** = aligned CSS grid (name | ratio | 🧾 | bar | %). **Expenses tab** = big "Add expense"
+  button → modal; **opens by default on phones** (JS `finappViewportWidth`). **Tighter, capped (90vh) modals.**
+- **Secrets → GCP Secret Manager:** `ConnectionStrings__FinApp` (secret `finapp-db`) and `Jwt__Key` (secret
+  `finapp-jwt`) — both rotated, plaintext env vars removed, old versions disabled. To change one secret on the
+  service use `--update-secrets` (NOT `--set-secrets`, which replaces the whole list).
+
+## Data import tool — `tools/FinApp.Seed`
+Console seeder: logs in, **creates a NEW account (deletes a same-named one first — idempotent)**, builds the
+aggregate via the domain + `AccountSnapshotSerializer`, pushes the snapshot. Two modes:
+- CSV expenses (`SEED_CSV`, `sample-expenses.csv` documents the layout).
+- **Family workbook** (`SEED_FAMILY=family.json`): `extract_family.py` parses the user's monthly budget xlsx
+  (Jan–Jun) → `family.json` (single fund = sum of the top fund rows; income via the running-sum total under
+  "Приход" mapped to January's contributor template; budgets/savings/expenses; expense dates recovered from
+  Excel's mis-parsed dd/mm). The seeder closes every period except the latest. **`family.json` + workbook dumps are
+  gitignored** (private financial data). Run against local first; the user ran it live into their own "Family" account.
+- Bundled Python lives at the Cloud SDK path (no `python` on PATH); install openpyxl into it.
+
+
 
 ## Tech-debt cleanup (2026-06-24, on `main`)
 `feature/account-tab-changes` was **merged + pushed to `origin/main`** (GitHub shonzi91/FinApp). Debt status:
