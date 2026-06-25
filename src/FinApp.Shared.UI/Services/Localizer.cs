@@ -81,8 +81,11 @@ public sealed class Localizer(IJSRuntime js)
         ["Couldn’t reach the server. Check your connection and try again."] =
             "Сървърът е недостъпен. Провери връзката и опитай отново.",
 
+        // Brand
+        ["Budget like a budgie."] = "Бюджет, лек като перце.",
+
         // First run
-        ["Welcome to FinApp"] = "Добре дошъл във FinApp",
+        ["Welcome to Budgiely"] = "Добре дошъл в Budgiely",
         ["Create your first account to get started (e.g. Personal, Shared, Family)."] =
             "Създай първия си профил, за да започнеш (напр. Личен, Споделен, Семеен).",
         ["Account name"] = "Име на профил",

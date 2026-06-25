@@ -1,4 +1,6 @@
-# FinApp
+# Budgiely 🐤
+
+*Budget like a budgie.*
 
 A privacy-first budgeting & expense tracker. Money is organised **period by period**
 inside first-level accounts (Personal, Shared, Family), with budgets, an expense ledger,
