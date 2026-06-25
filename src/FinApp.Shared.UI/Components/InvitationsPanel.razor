@@ -1,30 +1,51 @@
 @inject BudgetingState State
+@inject Localizer Loc
 
 @if (State.PendingInvitationCount > 0)
 {
-    <section class="panel invites">
-        <div class="panel-head"><h2>Invitations</h2></div>
-        <ul class="list">
+    <section class="invites">
+        <div class="invites-head">
+            <span class="invites-icon">✉️</span>
+            <div class="invites-title">
+                <h3>@Loc["You’re invited"]</h3>
+                <p>@State.PendingInvitationCount @(State.PendingInvitationCount == 1 ? Loc["pending invitation"] : Loc["pending invitations"])</p>
+            </div>
+        </div>
+
+        <ul class="invite-list">
             @foreach (var inv in State.PendingInvitations)
             {
-                <li>
-                    <span><strong>@inv.InvitedByUsername</strong> invited you to <strong>@inv.AccountName</strong></span>
-                    <span class="row-actions">
-                        <button class="primary" @onclick="() => Accept(inv.Id)">Accept</button>
-                        <button class="link" @onclick="() => Decline(inv.Id)">Decline</button>
+                <li class="invite">
+                    <span class="invite-avatar">@Initials(inv.InvitedByUsername)</span>
+                    <span class="invite-text">
+                        <strong>@inv.InvitedByUsername</strong> @Loc["invited you to"] <strong>@inv.AccountName</strong>
+                    </span>
+                    <span class="invite-actions">
+                        <button class="invite-accept" @onclick="() => Accept(inv.Id)">✓ @Loc["Accept"]</button>
+                        <button class="invite-decline" @onclick="() => Decline(inv.Id)">@Loc["Decline"]</button>
                     </span>
                 </li>
             }
         </ul>
+
         @if (_error is not null)
         {
-            <div class="alert warn-bg">@_error</div>
+            <div class="invite-error">@_error</div>
         }
     </section>
 }
 
 @code {
     private string? _error;
+
+    private static string Initials(string name)
+    {
+        name = name?.Trim() ?? "";
+        if (name.Length == 0) return "?";
+        var parts = name.Split(new[] { ' ', '.', '_', '-' }, StringSplitOptions.RemoveEmptyEntries);
+        var s = parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}" : name[..Math.Min(2, name.Length)];
+        return s.ToUpperInvariant();
+    }
 
     private Task Accept(Guid id) => Run(() => State.AcceptInvitation(id));
     private Task Decline(Guid id) => Run(() => State.DeclineInvitation(id));

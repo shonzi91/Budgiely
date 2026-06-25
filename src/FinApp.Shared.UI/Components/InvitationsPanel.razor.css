@@ -1,0 +1,61 @@
+.invites {
+    border: 1px solid #e6def9;
+    background: linear-gradient(135deg, #f6f3ff 0%, #eef1ff 100%);
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 16px rgba(79, 70, 229, .10);
+}
+
+.invites-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.invites-icon {
+    width: 42px; height: 42px; flex: 0 0 auto; border-radius: 12px;
+    display: grid; place-items: center; font-size: 1.25rem;
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    box-shadow: 0 4px 10px rgba(91, 33, 182, .30);
+}
+.invites-title h3 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #312e81; }
+.invites-title p { margin: 1px 0 0; font-size: .78rem; color: #6d6aa8; }
+
+.invite-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.invite {
+    display: flex; align-items: center; gap: 12px;
+    background: #fff; border: 1px solid #ece8fb; border-radius: 12px; padding: 10px 12px;
+    transition: box-shadow .12s, transform .12s;
+}
+.invite:hover { box-shadow: 0 6px 16px rgba(79, 70, 229, .12); transform: translateY(-1px); }
+
+.invite-avatar {
+    width: 36px; height: 36px; flex: 0 0 auto; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 700; font-size: .8rem;
+    color: #fff; background: linear-gradient(135deg, #a78bfa, #6366f1);
+}
+.invite-text { flex: 1; min-width: 0; font-size: .88rem; color: #2b2f3a; line-height: 1.4; }
+.invite-text strong { color: #4f46e5; font-weight: 700; }
+
+.invite-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.invite-accept {
+    border: none; border-radius: 10px; padding: 8px 16px; font-size: .85rem; font-weight: 700;
+    cursor: pointer; color: #fff; background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    box-shadow: 0 3px 8px rgba(79, 70, 229, .28); transition: filter .12s, transform .06s;
+}
+.invite-accept:hover { filter: brightness(1.08); }
+.invite-accept:active { transform: scale(.97); }
+.invite-decline {
+    border: 1px solid #dfe1ea; background: #fff; color: #6b7280;
+    border-radius: 10px; padding: 8px 14px; font-size: .85rem; font-weight: 600; cursor: pointer;
+    transition: background .12s, color .12s;
+}
+.invite-decline:hover { background: #f5f3fb; color: #4b5563; }
+
+.invite-error {
+    margin-top: 10px; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
+    border-radius: 10px; padding: 8px 12px; font-size: .82rem;
+}
+
+@media (max-width: 720px) {
+    .invite { flex-wrap: wrap; }
+    .invite-text { flex-basis: calc(100% - 48px); }
+    .invite-actions { width: 100%; }
+    .invite-accept { flex: 1; }
+}

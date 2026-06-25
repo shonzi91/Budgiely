@@ -108,6 +108,14 @@ public sealed class Localizer(IJSRuntime js)
         ["Closed"] = "Затворен",
         ["shared"] = "споделен",
 
+        // Invitations
+        ["You’re invited"] = "Имаш покана",
+        ["pending invitation"] = "чакаща покана",
+        ["pending invitations"] = "чакащи покани",
+        ["invited you to"] = "те покани в",
+        ["Accept"] = "Приеми",
+        ["Decline"] = "Откажи",
+
         // Panels / headings
         ["Funds"] = "Сметки",
         ["Transfer money"] = "Прехвърли пари",
