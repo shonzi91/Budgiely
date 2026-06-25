@@ -170,6 +170,11 @@ auth.MapPost("/register", async (RegisterRequest req, AuthService svc, Cancellat
     Results.Ok(await svc.RegisterAsync(req, ct)));
 auth.MapPost("/login", async (LoginRequest req, AuthService svc, CancellationToken ct) =>
     Results.Ok(await svc.LoginAsync(req, ct)));
+auth.MapPost("/password", async (ChangePasswordRequest req, ClaimsPrincipal user, AuthService svc, CancellationToken ct) =>
+{
+    await svc.ChangePasswordAsync(user.UserId(), req, ct);
+    return Results.NoContent();
+}).RequireAuthorization();
 
 app.MapGet("/me", (ClaimsPrincipal user) =>
         Results.Ok(new UserDto(user.UserId(), user.Username(), user.Email())))

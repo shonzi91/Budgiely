@@ -226,6 +226,11 @@ static Account BuildFamilyAccount(AccountSummaryDto summary, FamilyData fd, stri
 
         prev = period;
     }
+
+    // Past months are done — only the latest period stays active/editable.
+    foreach (var p in account.Periods.Take(account.Periods.Count - 1))
+        p.Close();
+
     return account;
 }
 

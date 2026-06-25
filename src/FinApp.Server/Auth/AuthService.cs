@@ -55,4 +55,17 @@ public sealed class AuthService(FinAppDbContext db, IPasswordHasher hasher, JwtT
 
         return tokens.Issue(user);
     }
+
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct)
+            ?? throw new UnauthorizedException("Not signed in.");
+        if (!hasher.Verify(request.CurrentPassword ?? "", user.PasswordHash))
+            throw new BadRequestException("Current password is incorrect.");
+        if ((request.NewPassword ?? "").Length < MinPasswordLength)
+            throw new BadRequestException($"Password must be at least {MinPasswordLength} characters.");
+
+        user.SetPasswordHash(hasher.Hash(request.NewPassword!));
+        await db.SaveChangesAsync(ct);
+    }
 }

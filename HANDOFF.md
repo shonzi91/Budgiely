@@ -484,6 +484,13 @@ These are the agreed next big pieces, roughly in dependency order. Each is a mul
   base URL to the deployed origin; container (Dockerfile) or PaaS (Azure App Service/Container Apps, Fly.io, Render, or a
   VPS with a persistent disk). `AccountStore.Migrate()` already applies EF migrations on startup.
 
+### (NEW) Account reports / health / insights tab
+A dedicated tab for **reports, financial health, analysis and insights** per account: e.g. spend-by-category
+trends across periods, budget-adherence/overspend history, savings-rate trajectory, fund-balance over time,
+income-vs-expense, top categories, month-over-month deltas, and simple insights/alerts. Reads from the existing
+period aggregate (budgets/expenses/savings/contributions already there) — mostly a new read-only tab + a few
+derived metrics + charts. (Added 2026-06-25 at the user's request.)
+
 ### 3. Customizable notifications, per account, per user
 - **Domain hooks already exist** to drive triggers: budget `AlertThreshold` + `NotifyOnEveryExpense`, saving
   `AlertThreshold` + `NotifyOnMilestone`, plus `Period.Deficit` (overspend) and savings-goal progress.

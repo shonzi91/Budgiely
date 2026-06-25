@@ -11,3 +11,6 @@ public record AuthResponse(string Token, Guid UserId, string Username, string Em
 
 /// <summary>A user as seen over the wire (never includes the password hash).</summary>
 public record UserDto(Guid Id, string Username, string Email);
+
+/// <summary>Change the signed-in user's password (the server verifies <see cref="CurrentPassword"/> first).</summary>
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);

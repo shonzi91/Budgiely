@@ -50,6 +50,13 @@ public sealed class Localizer(IJSRuntime js)
         // App chrome
         ["Hello,"] = "Здравей,",
         ["Sign out"] = "Изход",
+        ["Profile settings"] = "Настройки на профила",
+        ["Change password"] = "Смяна на парола",
+        ["Current password"] = "Текуща парола",
+        ["New password"] = "Нова парола",
+        ["Confirm new password"] = "Потвърди новата парола",
+        ["Password changed."] = "Паролата е сменена.",
+        ["The new passwords don’t match."] = "Новите пароли не съвпадат.",
         ["Loading…"] = "Зареждане…",
         ["Saving…"] = "Запазване…",
         ["Dismiss"] = "Затвори",
