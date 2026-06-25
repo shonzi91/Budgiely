@@ -247,11 +247,15 @@ button.link { background: none; border: none; color: #4f46e5; font-weight: 600; 
 .date-sep:hover { color: #4338ca; text-decoration: underline; }
 
 /* Modals */
+/* NB: Bootstrap also defines .modal / .modal-backdrop — override the properties it leaks
+   (position:fixed/top/left/height on .modal, opacity:0 on the backdrop) so our box stays
+   a normal flex child centered by the backdrop. */
 .modal-backdrop {
-    position: fixed; inset: 0; background: rgba(17,20,28,.45);
+    position: fixed; inset: 0; background: rgba(17,20,28,.45); opacity: 1;
     display: flex; align-items: center; justify-content: center; z-index: 50;
 }
 .modal {
+    position: static; inset: auto; height: auto;
     background: #fff; border-radius: 16px; padding: 18px 20px; width: min(420px, 92vw);
     max-height: 90vh; overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 9px;

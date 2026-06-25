@@ -54,7 +54,13 @@ var auth = (await login.Content.ReadFromJsonAsync<AuthResponse>())!;
 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
 Console.WriteLine($"  logged in as {auth.Username} ({auth.UserId})");
 
-// 2) Create the account -------------------------------------------------------------------------
+// 2) Create the account (replacing any existing one with the same name, so re-runs are clean) ---
+var existing = await http.GetFromJsonAsync<List<AccountSummaryDto>>("/accounts") ?? [];
+foreach (var a in existing.Where(a => a.IsOwner && string.Equals(a.Name, accountName, StringComparison.OrdinalIgnoreCase)))
+{
+    await http.DeleteAsync($"/accounts/{a.Id}");
+    Console.WriteLine($"  removed existing account “{a.Name}” {a.Id}");
+}
 var createResp = await http.PostAsJsonAsync("/accounts", new CreateAccountRequest(accountName, currency));
 if (!createResp.IsSuccessStatusCode)
 {
