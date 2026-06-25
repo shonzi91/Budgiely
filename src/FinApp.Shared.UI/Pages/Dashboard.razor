@@ -16,9 +16,10 @@
 else if (!State.HasAccounts)
 {
     <div class="firstrun">
+        <div class="firstrun-mascot"><BudgieLogo /></div>
         <h1>@Loc["Welcome to Budgiely"]</h1>
+        <p class="firstrun-lead">@Loc["Let’s feather your nest. Create your first account to get started (e.g. Personal, Shared, Family)."]</p>
         <InvitationsPanel />
-        <p>@Loc["Create your first account to get started (e.g. Personal, Shared, Family)."]</p>
         @if (_error is not null)
         {
             <div class="alert warn-bg"><span>@_error</span><button class="alert-x" title="@Loc["Dismiss"]" @onclick="() => _error = null">×</button></div>
@@ -123,8 +124,8 @@ else
             @if (State.Deficit.Amount > 0)
             {
                 <div class="alert warn-bg">
-                    <strong>Overspent by @Fmt(State.Deficit).</strong>
-                    <span>Expenses ate into your savings earmark. This will need to be covered next period (from a savings bucket or fresh contributions).</span>
+                    <strong>🪶 @Loc["Ruffled feathers — overspent by"] @Fmt(State.Deficit).</strong>
+                    <span>@Loc["Expenses ate into your savings earmark. This will need to be covered next period (from a savings bucket or fresh contributions)."]</span>
                 </div>
             }
 
@@ -163,7 +164,7 @@ else
                     }
                     @if (!State.RootFunds.Any())
                     {
-                        <li><em>@Loc["No funds yet — add one."]</em></li>
+                        <li><em>@Loc["No funds yet — add where your money lives."]</em></li>
                     }
                 </ul>
             </section>
@@ -267,7 +268,7 @@ else
                     }
                     @if (!State.ContributionsThisPeriod.Any())
                     {
-                        <li><em>@Loc["no deposits yet"]</em></li>
+                        <li><em>@Loc["Nothing in the nest yet — add a deposit."]</em></li>
                     }
                 </ul>
             </section>
@@ -338,7 +339,7 @@ else
                 }
                 @if (!shown.Any())
                 {
-                    <ul class="list"><li><em>@Loc["No expenses yet."]</em></li></ul>
+                    <ul class="list"><li><em>@Loc["Nothing’s perched here yet — add your first expense."]</em></li></ul>
                 }
                 else if (_dayView is not null)
                 {
@@ -407,7 +408,7 @@ else
                     }
                     @if (!State.SavingBuckets.Any())
                     {
-                        <li><em>@Loc["No buckets yet — add one to start saving."]</em></li>
+                        <li><em>@Loc["Your nest is empty — start a savings bucket and watch it grow."]</em></li>
                     }
                 </ul>
             </section>

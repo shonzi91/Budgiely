@@ -86,8 +86,11 @@ public sealed class Localizer(IJSRuntime js)
 
         // First run
         ["Welcome to Budgiely"] = "Добре дошъл в Budgiely",
-        ["Create your first account to get started (e.g. Personal, Shared, Family)."] =
-            "Създай първия си профил, за да започнеш (напр. Личен, Споделен, Семеен).",
+        ["Let’s feather your nest. Create your first account to get started (e.g. Personal, Shared, Family)."] =
+            "Да подредим гнездото. Създай първия си профил, за да започнеш (напр. Личен, Споделен, Семеен).",
+        ["Ruffled feathers — overspent by"] = "Разрошени пера — преразход с",
+        ["Expenses ate into your savings earmark. This will need to be covered next period (from a savings bucket or fresh contributions)."] =
+            "Разходите изядоха заделените спестявания. Това трябва да се покрие следващия период (от спестовна каса или нови вноски).",
         ["Account name"] = "Име на профил",
         ["Currency"] = "Валута",
         ["It starts with a few starter categories and the current month’s period — you can change everything."] =
@@ -169,12 +172,13 @@ public sealed class Localizer(IJSRuntime js)
         // Common inline labels / empty states
         ["Amount"] = "Сума",
         ["Note (optional)"] = "Бележка (по избор)",
-        ["no deposits yet"] = "още няма вноски",
+        ["Nothing in the nest yet — add a deposit."] = "Още нищо в гнездото — добави вноска.",
         ["deposited"] = "внесени",
-        ["No funds yet — add one."] = "Още няма сметки — добави.",
+        ["No funds yet — add where your money lives."] = "Още няма сметки — добави къде стоят парите ти.",
         ["No expenses yet."] = "Още няма разходи.",
+        ["Nothing’s perched here yet — add your first expense."] = "Тук още нищо не е кацнало — добави първия си разход.",
         ["No members in this account yet."] = "Още няма членове в този профил.",
-        ["No buckets yet — add one to start saving."] = "Още няма каси — добави, за да започнеш да спестяваш.",
+        ["Your nest is empty — start a savings bucket and watch it grow."] = "Гнездото е празно — започни спестовна каса и я гледай как расте.",
         ["Deposit"] = "Внеси",
         ["Total saved:"] = "Общо спестено:",
         ["Total saved"] = "Общо спестено",
