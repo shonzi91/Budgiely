@@ -39,7 +39,19 @@ New EF migration **`AddExpenseOnBehalfOfOtherAccount`** (single bool column; app
 **Files:** `Domain/Budgeting/Expense.cs`, `Domain/Periods/Period.cs`, `Domain/Accounts/Account.cs`,
 `Contracts/AccountSnapshotSerializer.cs`, `Persistence/FinAppDbContext.cs` + new migration, `Shared.UI/Services/BudgetingState.cs`,
 `Shared.UI/Pages/Dashboard.razor`(+`.css`), `Shared.UI/Services/Localizer.cs` (BG strings), `Domain.Tests/AccountPeriodTests.cs`.
-**Not yet deployed** — redeploy with `gcloud run deploy finapp --source . --region europe-west1` when ready.
+Deployed as **finapp-00022** (`gcloud run deploy finapp --source . --region europe-west1`).
+
+### Session 11b — savings caps reserve TOTAL accumulated savings (not just this period). 102 tests (78 domain).
+Bug from live use: "Available to save / transfer / budget" only subtracted **this period's** net savings, so money saved
+in earlier periods (now sitting in the carried-over opening balance) looked freshly allocatable — you could re-budget or
+re-save it. Fix: all three caps now reserve the **whole accumulated savings** (incl. pre-app initial balances). Since the
+caps live in `Period` (which can't see sibling periods), the relevant members take an optional `Money? priorSaved` arg
+(default `null`/zero → unchanged for existing tests). New `*After(priorSaved)` variants:
+`AvailableToSaveAfter`, `MaxAdditionalSavingsAfter`, `AvailableToTransferOutAfter`, `AvailableToTransferOutFromFundAfter`,
+plus `MaxBudgetFor(categoryId, priorSaved)`; `AllocateToSavings`/`EditSavingDeposit`/`SetBudget`/`TransferOut` gained the
+optional arg. `BudgetingState.PriorSaved = SavingsReportService.AccumulatedTotal(account) − Period.SavingsNetTotal`
+(prior periods + initial), passed at every save/budget/transfer call site and the read members. **New "Available to budget"
+hint** on the Add/Edit-category modals (`State.MaxBudgetFor`). Test: `Prior_period_savings_are_reserved_and_not_re_allocatable`.
 
 ## Session 10 (2026-06-25) — branding, polish, data import, perf
 All on `main`, deployed (latest revision ~finapp-00021). Highlights since the 06-24 debt cleanup:

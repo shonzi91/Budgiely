@@ -157,16 +157,17 @@ public sealed class Period : Entity
     /// outflow: it lowers the fund's position and the period's closing balance. Net-of-account, not
     /// net-neutral. The matching deposit is recorded separately in the destination account.
     /// </summary>
-    public ExternalTransfer TransferOut(Guid fundId, Money amount, DateOnly date, Guid? toAccountId = null, string? note = null)
+    public ExternalTransfer TransferOut(Guid fundId, Money amount, DateOnly date, Guid? toAccountId = null, string? note = null, Money? priorSaved = null)
     {
         EnsureCurrency(amount);
         EnsureOpen();
         if (amount > FundBalance(fundId))
             throw new InvalidOperationException(
                 $"That fund only holds {FundBalance(fundId)}; move money into it from another fund first.");
-        if (amount > AvailableToTransferOut)
+        var available = AvailableToTransferOutAfter(priorSaved ?? Money.Zero(Currency));
+        if (amount > available)
             throw new InvalidOperationException(
-                $"Can't send more than the unreserved cash ({AvailableToTransferOut}); the rest is earmarked for savings.");
+                $"Can't send more than the unreserved cash ({available}); the rest is earmarked for savings.");
         var transfer = new ExternalTransfer(fundId, amount, date, toAccountId, note);
         _externalTransfers.Add(transfer);
         return transfer;
@@ -177,22 +178,26 @@ public sealed class Period : Entity
     /// account (<see cref="ExpectedClosingBalance"/>) minus what's already earmarked for savings. Unlike an
     /// expense (which may overspend), a discretionary transfer shouldn't break the savings earmark.
     /// </summary>
-    public Money AvailableToTransferOut
+    public Money AvailableToTransferOut => AvailableToTransferOutAfter(Money.Zero(Currency));
+
+    /// <summary>As <see cref="AvailableToTransferOut"/>, but counting <paramref name="priorSaved"/> (savings
+    /// accumulated in earlier periods / initial balances) as earmarked too, so carried-over savings can't be sent out.</summary>
+    public Money AvailableToTransferOutAfter(Money priorSaved)
     {
-        get
-        {
-            var earmarked = SavingsNetTotal.IsNegative ? Money.Zero(Currency) : SavingsNetTotal;
-            var free = ExpectedClosingBalance - earmarked;
-            return free.IsNegative ? Money.Zero(Currency) : free;
-        }
+        var total = SavingsNetTotal + priorSaved;
+        var earmarked = total.IsNegative ? Money.Zero(Currency) : total;
+        var free = ExpectedClosingBalance - earmarked;
+        return free.IsNegative ? Money.Zero(Currency) : free;
     }
 
     /// <summary>The most that can be sent out <b>from a specific fund</b>: the lower of what that fund actually
     /// holds and the account-wide unreserved cash (so neither the fund nor the savings earmark goes negative).</summary>
-    public Money AvailableToTransferOutFromFund(Guid fundId)
+    public Money AvailableToTransferOutFromFund(Guid fundId) => AvailableToTransferOutFromFundAfter(fundId, Money.Zero(Currency));
+
+    public Money AvailableToTransferOutFromFundAfter(Guid fundId, Money priorSaved)
     {
         var inFund = FundBalance(fundId);
-        var freeCash = AvailableToTransferOut;
+        var freeCash = AvailableToTransferOutAfter(priorSaved);
         return inFund < freeCash ? inFund : freeCash;
     }
 
@@ -287,7 +292,7 @@ public sealed class Period : Entity
     /// in the account (<see cref="ExpectedClosingBalance"/>). (Actual expenses are not capped — overspending
     /// is allowed.)
     /// </summary>
-    public Budget SetBudget(Guid categoryId, Money allocated, decimal alertThreshold = 0.80m, bool notifyOnEveryExpense = false)
+    public Budget SetBudget(Guid categoryId, Money allocated, decimal alertThreshold = 0.80m, bool notifyOnEveryExpense = false, Money? priorSaved = null)
     {
         EnsureCurrency(allocated);
         if (allocated.IsNegative)
@@ -295,7 +300,8 @@ public sealed class Period : Entity
 
         var existing = FindBudget(categoryId);
         var othersBudgeted = BudgetedTotal - (existing?.Allocated ?? Money.Zero(Currency));
-        if (othersBudgeted + allocated + SavingsNetTotal > ExpectedClosingBalance)
+        var totalSaved = SavingsNetTotal + (priorSaved ?? Money.Zero(Currency));
+        if (othersBudgeted + allocated + totalSaved > ExpectedClosingBalance)
             throw new InvalidOperationException(
                 $"Budgets + savings can't exceed the money in the account ({ExpectedClosingBalance}).");
 
@@ -359,15 +365,16 @@ public sealed class Period : Entity
 
     // --- Savings ----------------------------------------------------------
 
-    public SavingAllocation AllocateToSavings(Guid savingCategoryId, Money amount, DateOnly date, string? note = null)
+    public SavingAllocation AllocateToSavings(Guid savingCategoryId, Money amount, DateOnly date, string? note = null, Money? priorSaved = null)
     {
         EnsureCurrency(amount);
         EnsureOpen();
         if (amount.IsNegative)
             throw new ArgumentException("Use ConvertSavingToExpense to draw down savings.", nameof(amount));
-        if (amount > MaxAdditionalSavings)
+        var max = MaxAdditionalSavingsAfter(priorSaved ?? Money.Zero(Currency));
+        if (amount > max)
             throw new InvalidOperationException(
-                $"Cannot save more than the money available after budgets ({MaxAdditionalSavings} available).");
+                $"Cannot save more than the money available after budgets ({max} available).");
         var allocation = new SavingAllocation(savingCategoryId, amount, date, note);
         _savingAllocations.Add(allocation);
         return allocation;
@@ -396,7 +403,7 @@ public sealed class Period : Entity
     }
 
     /// <summary>Change the amount of a manual savings deposit (re-checks the savings cap; keeps its original date).</summary>
-    public void EditSavingDeposit(Guid allocationId, Money newAmount)
+    public void EditSavingDeposit(Guid allocationId, Money newAmount, Money? priorSaved = null)
     {
         EnsureCurrency(newAmount);
         EnsureOpen();
@@ -408,11 +415,12 @@ public sealed class Period : Entity
             throw new InvalidOperationException("Only a savings deposit can be edited here.");
 
         _savingAllocations.Remove(old);
-        if (newAmount > MaxAdditionalSavings)
+        var max = MaxAdditionalSavingsAfter(priorSaved ?? Money.Zero(Currency));
+        if (newAmount > max)
         {
             _savingAllocations.Add(old); // restore before failing
             throw new InvalidOperationException(
-                $"Cannot save more than the money available after budgets ({MaxAdditionalSavings} available).");
+                $"Cannot save more than the money available after budgets ({max} available).");
         }
         if (!newAmount.IsZero)
             _savingAllocations.Add(new SavingAllocation(old.SavingCategoryId, newAmount, old.Date));
@@ -562,16 +570,28 @@ public sealed class Period : Entity
     /// less what's already committed to budgets. Opening fund balances <b>do</b> count — carried-over money simply
     /// sits there, so it's spendable without any separate carryover mechanism.
     /// </summary>
-    public Money AvailableToSave => ExpectedClosingBalance - BudgetedTotal;
+    public Money AvailableToSave => AvailableToSaveAfter(Money.Zero(Currency));
+
+    /// <summary>As <see cref="AvailableToSave"/>, but reserving <paramref name="priorSaved"/> (savings accumulated
+    /// in earlier periods / initial balances), so carried-over savings aren't offered up for re-allocation.</summary>
+    public Money AvailableToSaveAfter(Money priorSaved) => ExpectedClosingBalance - BudgetedTotal - priorSaved;
 
     /// <summary>How much more can still be moved into savings without exceeding <see cref="AvailableToSave"/>.</summary>
-    public Money MaxAdditionalSavings
+    public Money MaxAdditionalSavings => MaxAdditionalSavingsAfter(Money.Zero(Currency));
+
+    public Money MaxAdditionalSavingsAfter(Money priorSaved)
     {
-        get
-        {
-            var headroom = AvailableToSave - SavingsNetTotal;
-            return headroom.IsNegative ? Money.Zero(Currency) : headroom;
-        }
+        var headroom = AvailableToSaveAfter(priorSaved) - SavingsNetTotal;
+        return headroom.IsNegative ? Money.Zero(Currency) : headroom;
+    }
+
+    /// <summary>The most that could be allocated to a single category's budget: the money in the account, minus what's
+    /// budgeted in <i>other</i> categories and minus all savings (this period's plus <paramref name="priorSaved"/>).</summary>
+    public Money MaxBudgetFor(Guid categoryId, Money priorSaved)
+    {
+        var othersBudgeted = BudgetedTotal - (FindBudget(categoryId)?.Allocated ?? Money.Zero(Currency));
+        var headroom = ExpectedClosingBalance - othersBudgeted - SavingsNetTotal - priorSaved;
+        return headroom.IsNegative ? Money.Zero(Currency) : headroom;
     }
 
     // --- Lifecycle --------------------------------------------------------

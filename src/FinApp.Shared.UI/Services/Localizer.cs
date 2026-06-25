@@ -238,5 +238,8 @@ public sealed class Localizer(IJSRuntime js)
         ["Adjust budgets to this period’s spending"] = "Коригирай бюджетите спрямо разходите за този период",
         ["Each budget moves halfway toward what was actually spent, rounded up to the nearest 10."] =
             "Всеки бюджет се приближава наполовина към реално похарченото, закръглено нагоре до 10.",
+        ["Available to budget:"] = "Налично за бюджет:",
+        ["the money in the account, minus what's budgeted elsewhere and already saved"] =
+            "парите в профила, минус бюджетираното другаде и вече спестеното",
     };
 }

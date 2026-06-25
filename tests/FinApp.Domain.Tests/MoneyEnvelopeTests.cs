@@ -44,6 +44,27 @@ public class MoneyEnvelopeTests
     }
 
     [Fact]
+    public void Prior_period_savings_are_reserved_and_not_re_allocatable()
+    {
+        // 500 carried in (e.g. previously saved money sitting in the opening balance). With 200 already saved in
+        // earlier periods, only 300 of it is free to budget, save again, or send to another account.
+        var period = PeriodWith(opening: 500, contributed: 0, out _, out var fund, out var category);
+        var priorSaved = M(200);
+
+        Assert.Equal(M(300), period.MaxAdditionalSavingsAfter(priorSaved));        // 500 - 200
+        Assert.Equal(M(300), period.AvailableToSaveAfter(priorSaved));
+        Assert.Equal(M(300), period.MaxBudgetFor(category, priorSaved));
+        Assert.Equal(M(300), period.AvailableToTransferOutFromFundAfter(fund, priorSaved));
+
+        // Budgeting past the reserved savings is rejected; the un-reserved 300 is fine.
+        Assert.Throws<InvalidOperationException>(() => period.SetBudget(category, M(301), priorSaved: priorSaved));
+        period.SetBudget(category, M(300), priorSaved: priorSaved);
+
+        // And no headroom is left to save on top of that budget.
+        Assert.Equal(M(0), period.MaxAdditionalSavingsAfter(priorSaved));
+    }
+
+    [Fact]
     public void Opening_funds_count_toward_the_savings_ceiling()
     {
         // You can set aside money you actually have — an opening balance (e.g. carried over) is savable.

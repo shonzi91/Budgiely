@@ -287,15 +287,25 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     public Money Deficit => Period.Deficit;
     public bool HasDeficit => Period.Deficit.Amount > 0m;
 
+    /// <summary>
+    /// Savings accumulated <b>before</b> this period — total saved across the whole account (incl. pre-app initial
+    /// balances) minus this period's own net. The opening balances carry that money forward, so the planning caps
+    /// must reserve it: otherwise previously-saved money looks freshly available to budget, save or transfer again.
+    /// </summary>
+    private Money PriorSaved => _savings.AccumulatedTotal(Account) - Period.SavingsNetTotal;
+
     /// <summary>Most that can be sent to another account without breaking the savings earmark.</summary>
-    public Money AvailableToTransferOut => Period.AvailableToTransferOut;
+    public Money AvailableToTransferOut => Period.AvailableToTransferOutAfter(PriorSaved);
 
     /// <summary>Most that can be sent to another account from a specific fund (≤ that fund's balance).</summary>
-    public Money AvailableToTransferOutFromFund(Guid fundId) => Period.AvailableToTransferOutFromFund(fundId);
+    public Money AvailableToTransferOutFromFund(Guid fundId) => Period.AvailableToTransferOutFromFundAfter(fundId, PriorSaved);
     public Money SavingsThisPeriod => Period.SavingsNetTotal;
     public Money SavingsAccumulated => _savings.AccumulatedTotal(Account);
-    public Money MaxAdditionalSavings => Period.MaxAdditionalSavings;
-    public Money AvailableToSave => Period.AvailableToSave;
+    public Money MaxAdditionalSavings => Period.MaxAdditionalSavingsAfter(PriorSaved);
+    public Money AvailableToSave => Period.AvailableToSaveAfter(PriorSaved);
+
+    /// <summary>The most that can be allocated to a single category's budget right now (used for the "Available to budget" hint).</summary>
+    public Money MaxBudgetFor(Guid categoryId) => Period.MaxBudgetFor(categoryId, PriorSaved);
 
     public IReadOnlyList<Expense> AllExpenses =>
         Period.Expenses.OrderByDescending(e => e.Date).ToList();
@@ -460,13 +470,13 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
 
     public Task AllocateSaving(Guid savingCategoryId, decimal amount, string? note)
     {
-        Period.AllocateToSavings(savingCategoryId, Money(amount), Today(), note);
+        Period.AllocateToSavings(savingCategoryId, Money(amount), Today(), note, PriorSaved);
         return SaveAsync();
     }
 
     public Task EditSavingDeposit(Guid allocationId, decimal amount)
     {
-        Period.EditSavingDeposit(allocationId, Money(amount));
+        Period.EditSavingDeposit(allocationId, Money(amount), PriorSaved);
         return SaveAsync();
     }
 
@@ -621,7 +631,7 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
             throw new InvalidOperationException("Both accounts must use the same currency.");
 
         // 1) Record the outflow on this account and push it.
-        Period.TransferOut(fromFundId, Money(amount), Today(), destinationAccountId, note);
+        Period.TransferOut(fromFundId, Money(amount), Today(), destinationAccountId, note, PriorSaved);
         await SaveAsync();
 
         // 2) Load the destination, deposit into its current period for the signed-in user, and push it.
@@ -725,7 +735,7 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     // Budget CRUD
     public Task SaveBudget(Guid categoryId, decimal amount, decimal thresholdPercent, bool notifyEvery)
     {
-        Period.SetBudget(categoryId, Money(amount), thresholdPercent / 100m, notifyEvery);
+        Period.SetBudget(categoryId, Money(amount), thresholdPercent / 100m, notifyEvery, PriorSaved);
         return SaveAsync();
     }
 

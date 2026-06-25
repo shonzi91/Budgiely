@@ -484,6 +484,7 @@ else
                     <h3>@Loc["Add category"] @(_addParentId is {} p ? $"under {State.CategoryName(p)}" : "(top level)")</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
                     <label>Budget for this period (optional) <input type="number" step="0.01" min="0" @bind="_fBudget" /></label>
+                    <small class="hint">@Loc["Available to budget:"] <strong>@Fmt(State.MaxBudgetFor(Guid.Empty))</strong> (@Loc["the money in the account, minus what's budgeted elsewhere and already saved"]).</small>
                     <div class="modal-actions">
                         <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
                         <button @onclick="SaveAddCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Add"]</button>
@@ -494,6 +495,7 @@ else
                     <h3>@Loc["Edit"] @State.CategoryName(_modalCatId)</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
                     <label>Budget amount <input type="number" step="0.01" min="0" @bind="_fBudget" /></label>
+                    <small class="hint">@Loc["Available to budget:"] <strong>@Fmt(State.MaxBudgetFor(_modalCatId))</strong> (@Loc["the money in the account, minus what's budgeted elsewhere and already saved"]).</small>
                     <label>Alert at % <input type="number" step="1" min="0" max="100" @bind="_fThreshold" /></label>
                     <label class="check"><input type="checkbox" @bind="_fNotify" /> Notify on every expense</label>
                     <div class="modal-actions">
