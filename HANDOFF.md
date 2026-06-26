@@ -1,9 +1,17 @@
 # Budgiely (FinApp) — session handoff
 
-Last updated: 2026-06-25 (Session 11). Read this + [README.md](README.md) + recent `git log` to catch up.
+Last updated: 2026-06-26 (Session 11). Read this + [README.md](README.md) + recent `git log` to catch up.
 Product is now branded **Budgiely** 🐤 ("Budget like a budgie."); **code namespaces/assemblies stay `FinApp.*`**
 (product name ≠ assembly name — not worth a full rename). Live on Cloud Run, all on `origin/main` (GitHub
 shonzi91/FinApp — **repo not yet renamed to Budgiely**; user to do it in Settings, then repoint the remote).
+
+**Current state (2026-06-26):** live as **revision finapp-00032**; **104 tests pass** (80 domain + 5 persistence + 19 server).
+Session 11 ran long with many sub-sessions (11a–11i below) — money-model reshaping + UI polish. Money model now:
+*budgets are capped at `Current − savings + spent` (hard cap); savings is an advisory earmark (uncapped) and the only thing
+that reserves cash; `Free to allocate = Current − savings`; fund→fund transfers are uncapped (total-preserving), only
+sending money OUT of the account caps at the fund balance.* Settle-on-behalf, expenses calendar, and a per-account
+"savings configuration" roadmap item all landed/queued this session. Two EF migrations added (AddExpenseOnBehalfOfOtherAccount,
+AddExpenseSettlementLinks). Redeploy: `gcloud run deploy finapp --source . --region europe-west1`.
 
 ## Session 11 (2026-06-25) — 8 UX/feature requests (on `main`, all 101 tests green)
 Eight items from live use. **101 tests pass** (77 domain + 5 persistence + 19 server; +1 new domain test for #8).
@@ -734,8 +742,8 @@ to keep spending within what remains.
   - `HasUnallocatedFunds` deposit-block may be too eager now that opening money/carryover counts.
   - **Backfill** existing periods' carryover to the current `opening(n) − closing(n−1)` rule (offered to the user, not yet
     run) — a one-time recompute over stored snapshots.
-- **`git init`** the repo for real version history (currently none — this HANDOFF is the only change log). Add a regression
-  test sweep.
+- ~~`git init` the repo~~ ✅ done — repo is on GitHub `shonzi91/FinApp` (rename to Budgiely still pending). A regression
+  test sweep is still worthwhile.
 
 ## Still open (smaller items)
 - The vestigial `Period.CarriedIn` column is now **live** (repurposed as the signed carryover) — no longer cleanup; the old
