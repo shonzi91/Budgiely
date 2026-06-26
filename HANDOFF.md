@@ -103,6 +103,19 @@ impossible; everything else warns.** This is a self-contained commit — `git re
   (`Free_to_allocate_is_cash_minus_savings_ignoring_budgets`, etc.). Note: `Period.SetBudget` still takes a vestigial
   `priorSaved` param (no longer used) — left to avoid churn.
 
+### Session 11g — UI polish: tab-switch flicker, budget nesting, expenses calendar (UI-only).
+1. **Tab-switch flicker fixed** by not tearing down tab content: the `@switch (_tab)` became four always-mounted
+   `<div class="tabpanel" hidden="@(_tab != Tab.X)">` panels inside `<div class="tab-content">` (min-height 55vh,
+   `.tabpanel[hidden]{display:none}`). No DOM rebuild on switch (BudgetTreeNode/expense list/calendar stay mounted).
+2. **Budget tree nesting clearer:** `BudgetTreeNode` indents the whole `.tree-lead` by `Depth*20px` (was a 16px margin on
+   the name only), adds a `↳` twig for children, mutes child names (`.tree-name-child`), and tints nested rows
+   (`.tree-row.tree-child` — faint bg + inset left guide).
+3. **Expenses calendar view:** Expenses tab has a **List/Calendar** toggle (`_calendar`, ☰/📅 in the panel head). Calendar
+   = a Mon–Sun month grid over the period (`CalendarDays()` pads to whole weeks), each in-range day shows its spend total
+   (`byDay` dict) and is clickable → `OpenDayFromCalendar` focuses that day in the list. Out-of-range days greyed, today
+   outlined, selected day highlighted. New `.cal-*` CSS. Razor gotcha hit + fixed: build the cell's class in a `var cls`
+   local — inline `class="cal-cell@(...)"` with `""` string literals inside a double-quoted attribute breaks the parser.
+
 ## Session 10 (2026-06-25) — branding, polish, data import, perf
 All on `main`, deployed (latest revision ~finapp-00021). Highlights since the 06-24 debt cleanup:
 - **Rebrand → Budgiely:** `BudgieLogo.razor` (SVG budgie with a €-coin belly) in the app bar + sign-in screen;

@@ -279,6 +279,39 @@ button.link { background: none; border: none; color: #4f46e5; font-weight: 600; 
 .date-sep:first-child { padding-top: 4px; }
 .date-sep:hover { color: #4338ca; text-decoration: underline; }
 
+/* Tab panels stay mounted; only the active one shows (avoids tab-switch flicker). */
+.tab-content { min-height: 55vh; }
+.tabpanel[hidden] { display: none; }
+
+/* Expenses: list/calendar view toggle */
+.exp-views { display: flex; align-items: center; gap: 10px; }
+.view-toggle { display: inline-flex; border: 1px solid #dfe2f5; border-radius: 10px; overflow: hidden; }
+.view-btn { background: #fff; border: none; padding: 5px 10px; cursor: pointer; font-size: .92rem; color: #6b7280; line-height: 1; }
+.view-btn.active { background: #eef0fb; color: #4f46e5; }
+
+/* Expenses month calendar */
+.cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+.cal-dow span { text-align: center; font-size: .7rem; font-weight: 600; color: #9aa0ad; text-transform: uppercase; letter-spacing: .03em; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-cell {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    min-height: 58px; padding: 6px 2px; border: 1px solid #eceef2; border-radius: 10px;
+    background: #fff; cursor: pointer; font-family: inherit;
+}
+.cal-cell:hover:not(:disabled) { border-color: #c3c8ef; background: #f7f8ff; }
+.cal-num { font-size: .82rem; font-weight: 600; color: #1f2430; }
+.cal-total { font-size: .68rem; font-weight: 700; color: #4f46e5; background: #eef0fb; border-radius: 999px; padding: 1px 6px; }
+.cal-cell.cal-out { background: #fafbfc; border-color: #f1f3f6; cursor: default; }
+.cal-cell.cal-out .cal-num { color: #c7cad4; }
+.cal-cell.cal-today { border-color: #4f46e5; }
+.cal-cell.cal-today .cal-num { color: #4f46e5; }
+.cal-cell.cal-sel { background: #eef0fb; border-color: #4f46e5; }
+
+@media (max-width: 720px) {
+    .cal-cell { min-height: 48px; }
+    .cal-total { font-size: .6rem; padding: 1px 4px; }
+}
+
 /* Modals */
 /* NB: Bootstrap also defines .modal / .modal-backdrop — override the properties it leaks
    (position:fixed/top/left/height on .modal, opacity:0 on the backdrop) so our box stays

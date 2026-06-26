@@ -10,7 +10,11 @@
 }
 
 .tree-lead { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.tree-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-twig { color: #b9bdd0; font-size: .9rem; margin-right: -2px; flex: 0 0 auto; }
+.tree-name-child { font-weight: 500; color: #5b6270; }
+/* Nested rows get a faint indent guide + tint so hierarchy reads at a glance. */
+.tree-row.tree-child { background: #fafbfe; box-shadow: inset 2px 0 0 #e7e9f6; }
 
 .tree-amt { color: #6b7280; font-size: .8rem; white-space: nowrap; }
 .tree-exp { display: flex; justify-content: center; }

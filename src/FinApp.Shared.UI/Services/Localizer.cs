@@ -242,6 +242,8 @@ public sealed class Localizer(IJSRuntime js)
         ["In this fund:"] = "В този фонд:",
         ["⚠ This dips into money earmarked for savings."] = "⚠ Това навлиза в средства, заделени за спестявания.",
         ["your cash that isn't already set aside for savings"] = "парите ти, които още не са заделени за спестявания",
+        ["List"] = "Списък",
+        ["Calendar"] = "Календар",
         ["You have no other same-currency account to settle onto."] =
             "Нямаш друг профил в същата валута, към който да прехвърлиш.",
         ["Destination fund"] = "Целеви фонд",

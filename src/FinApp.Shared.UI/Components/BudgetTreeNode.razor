@@ -1,13 +1,17 @@
 @inject BudgetingState State
 
-<div class="tree-row">
-    <span class="tree-lead">
+<div class="tree-row @(Depth > 0 ? "tree-child" : "")">
+    <span class="tree-lead" style="padding-left:@(Depth * 20)px">
+        @if (Depth > 0)
+        {
+            <span class="tree-twig">↳</span>
+        }
         <span class="tree-actions">
             <button title="Edit budget / rename" @onclick="() => OnEdit.InvokeAsync(Node.Id)">✏️</button>
             <button title="Add sub-category" @onclick="() => OnAddSub.InvokeAsync(Node.Id)">➕</button>
             <button title="Delete category" @onclick="() => OnDelete.InvokeAsync(Node.Id)">🗑️</button>
         </span>
-        <span class="tree-name" style="margin-left:@(Depth * 16)px">@Node.Name</span>
+        <span class="tree-name @(Depth > 0 ? "tree-name-child" : "")">@Node.Name</span>
     </span>
 
     @if (State.BudgetFor(Node.Id) is not null)
