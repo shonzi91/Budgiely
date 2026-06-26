@@ -630,6 +630,28 @@ income-vs-expense, top categories, month-over-month deltas, and simple insights/
 period aggregate (budgets/expenses/savings/contributions already there) — mostly a new read-only tab + a few
 derived metrics + charts. (Added 2026-06-25 at the user's request.)
 
+### (NEW) Disciplined savings mode — per-account toggle (two-pool / fund-attributed savings)
+Added 2026-06-26 at the user's request. An **opt-in per-account setting** that switches savings from the current
+**earmark** model (model A: a bucket is a label over cash that stays in the funds; `Free = Current − savings`) to a
+**fund-attributed** model (model B: saving physically moves money **out of a fund into the bucket**, so the bucket is a
+real second container — essentially a fund that can't go below 0). The point: enforce discipline — saved money leaves the
+spendable pool, so the user is forced to keep spending within what remains.
+- **New account flag** `Account.DisciplinedSavings` (bool, default false; serializer + EF column + migration). Default
+  accounts keep model A untouched — this is purely additive.
+- **When on**, saving/releasing becomes a transfer between a fund and the bucket: it lowers/raises that **fund's balance**
+  (and so `ExpectedClosingBalance`/`Current`). The "Transfer bucket" dropdown's **Funds** section (the UI we discussed)
+  is how you move value fund↔bucket, clamped so a bucket can't go negative. "Add to savings" picks a source fund.
+- **Ripple to re-derive for mode B (the reason it's a real feature, not a tweak):** `ExpectedClosingBalance` subtracts
+  saved money (it left the funds); `FundBalance` drops on save; **`Free = Current`** (drop the `− savings` term — savings
+  is no longer inside Current); `Deficit`/"not backed by cash" largely disappears (you can't save cash you don't have);
+  the savings rate keys off transfers-in; period-start carryover tracks **two** kinds of container (funds + buckets).
+  Buckets need their own carried balance across periods. The reports/insights and the budget caps that compare to closing
+  all read the new closing. Worked example: Bank 1000, save 300 → A: Bank 1000, Current 1000, free 700; B: Bank 700,
+  Vacation 300, Current 700, free 700 (no `− savings`).
+- **Build approach:** branch the money-model reads on the flag (a small strategy seam in `Period`/`BudgetingState`),
+  keep all model-A tests green, add a parallel model-B test suite. The UI shows buckets as a separate "saved" pot and
+  relabels "Current" as spendable when the flag is on. **Confirm scope before starting — it's a model-level change.**
+
 ### 3. Customizable notifications, per account, per user
 - **Domain hooks already exist** to drive triggers: budget `AlertThreshold` + `NotifyOnEveryExpense`, saving
   `AlertThreshold` + `NotifyOnMilestone`, plus `Period.Deficit` (overspend) and savings-goal progress.
