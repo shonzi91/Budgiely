@@ -109,9 +109,9 @@ public sealed class Period : Entity
     {
         EnsureCurrency(amount);
         EnsureOpen();
+        // Intra-account moves are total-preserving — only where the money sits changes — so the source fund is
+        // allowed to go negative (no balance cap). Sending money OUT of the account (TransferOut) still caps at the balance.
         var transfer = new FundTransfer(fromFundId, toFundId, amount, date, note); // validates funds differ + amount > 0
-        if (amount > FundBalance(fromFundId))
-            throw new InvalidOperationException($"That fund only holds {FundBalance(fromFundId)} to move.");
         _fundTransfers.Add(transfer);
         return transfer;
     }

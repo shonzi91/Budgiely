@@ -1829,9 +1829,11 @@ else
     /// <summary>True when the transfer destination is another account (an outflow), not one of this account's funds.</summary>
     private bool TransferDestIsAccount => State.TransferableAccounts.Any(a => a.Id == _transferDestId);
 
-    /// <summary>Hard cap for the inline transfer form: the fund's physical balance (you can't move money that isn't there).
-    /// Dipping into the savings earmark is allowed — surfaced as a warning, not a block.</summary>
-    private decimal InlineTransferMax => State.FundBalance(_transferFromId).Amount;
+    /// <summary>Amount cap for the inline transfer form. Sending OUT to another account can't exceed the fund's physical
+    /// cash; moving between this account's own funds is uncapped (total is preserved — a fund may go negative).</summary>
+    private decimal InlineTransferMax => TransferDestIsAccount
+        ? State.FundBalance(_transferFromId).Amount
+        : decimal.MaxValue;
 
     /// <summary>True when an account send would draw on money earmarked for savings (allowed, but warned).</summary>
     private bool InlineTransferDipsSavings => TransferDestIsAccount
@@ -1902,8 +1904,10 @@ else
 
     private bool MTransferDestIsAccount => State.TransferableAccounts.Any(a => a.Id == _mTransferDestId);
 
-    /// <summary>Hard cap for the per-fund transfer popup: the fund's physical balance. Dipping into savings is warned, not blocked.</summary>
-    private decimal MTransferMax => State.FundBalance(_mTransferFromId).Amount;
+    /// <summary>Amount cap for the per-fund transfer popup. Sending OUT caps at the fund's cash; moving between own funds is uncapped.</summary>
+    private decimal MTransferMax => MTransferDestIsAccount
+        ? State.FundBalance(_mTransferFromId).Amount
+        : decimal.MaxValue;
 
     private bool MTransferDipsSavings => MTransferDestIsAccount
         && _mTransferAmount > State.AvailableToTransferOutFromFund(_mTransferFromId).Amount

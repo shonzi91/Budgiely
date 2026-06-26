@@ -209,7 +209,7 @@ public class MoneyEnvelopeTests
     }
 
     [Fact]
-    public void Internal_transfer_cannot_exceed_the_source_fund_balance()
+    public void Internal_transfer_can_overdraw_a_fund_total_is_preserved()
     {
         var account = new Account("Home", Eur);
         account.AddDefaultFunds();
@@ -218,10 +218,11 @@ public class MoneyEnvelopeTests
         var period = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
         period.SetInitialBalance(bank, M(100));
 
-        Assert.Throws<InvalidOperationException>(
-            () => period.TransferFunds(bank, cash, M(150), new DateOnly(2026, 1, 5)));
-        period.TransferFunds(bank, cash, M(100), new DateOnly(2026, 1, 5)); // exactly the balance is fine
-        Assert.Equal(M(0), period.FundBalance(bank));
+        // Moving more than Bank holds is allowed — it's just where the money sits. Bank goes negative, total unchanged.
+        period.TransferFunds(bank, cash, M(150), new DateOnly(2026, 1, 5));
+        Assert.Equal(M(-50), period.FundBalance(bank));
+        Assert.Equal(M(150), period.FundBalance(cash));
+        Assert.Equal(M(100), period.ExpectedClosingBalance); // total preserved (transfers don't change the closing balance)
     }
 
     [Fact]

@@ -3,6 +3,13 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
+/* Always reserve the scrollbar gutter so switching to a taller tab (e.g. Budgets) doesn't add a scrollbar
+   and shift the centered layout sideways. */
+html {
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
+}
+
 a, .btn-link {
     color: #006bb7;
 }

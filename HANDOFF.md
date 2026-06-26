@@ -116,6 +116,15 @@ impossible; everything else warns.** This is a self-contained commit — `git re
    outlined, selected day highlighted. New `.cal-*` CSS. Razor gotcha hit + fixed: build the cell's class in a `var cls`
    local — inline `class="cal-cell@(...)"` with `""` string literals inside a double-quoted attribute breaks the parser.
 
+### Session 11h — tab layout shift + uncapped intra-account fund transfers.
+1. **Budgets-tab sideways shift fixed:** the taller tab added a scrollbar → the centered `.dash` jumped. Added
+   `html { scrollbar-gutter: stable; overflow-y: scroll; }` to `App.Web/wwwroot/css/app.css` so the gutter is always reserved.
+2. **Fund→fund transfers are now uncapped** (total-preserving, a fund may go negative). Removed the `amount > FundBalance`
+   throw in `Period.TransferFunds`; **`TransferOut` (money leaving the account) still caps at the fund balance.** UI:
+   `InlineTransferMax`/`MTransferMax` cap only when the destination is another account; intra-account = `decimal.MaxValue`.
+   Test updated: `Internal_transfer_can_overdraw_a_fund_total_is_preserved` (Bank 100 → move 150 → Bank −50, Cash 150,
+   closing still 100). 80 domain / 104 total.
+
 ## Session 10 (2026-06-25) — branding, polish, data import, perf
 All on `main`, deployed (latest revision ~finapp-00021). Highlights since the 06-24 debt cleanup:
 - **Rebrand → Budgiely:** `BudgieLogo.razor` (SVG budgie with a €-coin belly) in the app bar + sign-in screen;
