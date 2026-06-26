@@ -294,12 +294,19 @@ button.link { background: none; border: none; color: #4f46e5; font-weight: 600; 
 .cal-dow span { text-align: center; font-size: .7rem; font-weight: 600; color: #9aa0ad; text-transform: uppercase; letter-spacing: .03em; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .cal-cell {
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
-    min-height: 58px; padding: 6px 2px; border: 1px solid #eceef2; border-radius: 10px;
-    background: #fff; cursor: pointer; font-family: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    min-height: 60px; padding: 5px; border: 1px solid #eceef2; border-radius: 10px;
+    background: #fff; cursor: pointer;
 }
-.cal-cell:hover:not(:disabled) { border-color: #c3c8ef; background: #f7f8ff; }
+.cal-cell:hover:not(.cal-out) { border-color: #c3c8ef; background: #f7f8ff; }
+.cal-top { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 2px; }
 .cal-num { font-size: .82rem; font-weight: 600; color: #1f2430; }
+.cal-add {
+    background: none; border: none; cursor: pointer; font-size: .74rem; line-height: 1;
+    padding: 0 2px; opacity: .45; border-radius: 5px;
+}
+.cal-cell:hover .cal-add { opacity: 1; }
+.cal-add:hover { background: #eef0fb; }
 .cal-total { font-size: .68rem; font-weight: 700; color: #4f46e5; background: #eef0fb; border-radius: 999px; padding: 1px 6px; }
 .cal-cell.cal-out { background: #fafbfc; border-color: #f1f3f6; cursor: default; }
 .cal-cell.cal-out .cal-num { color: #c7cad4; }

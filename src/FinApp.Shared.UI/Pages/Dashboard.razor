@@ -150,7 +150,7 @@ else
                             <span class="row-lead">
                                 <button class="exp-edit" title="@Loc["Edit"]" @onclick="() => OpenEditFund(f.Id)">✏️</button>
                                 <button class="exp-edit" title="@Loc["Remove"]" @onclick="() => OpenDeleteFund(f.Id)">🗑️</button>
-                                <span class="fund-name">@f.Name</span>
+                                <span class="fund-name"><span class="fund-ico">🏦</span> @f.Name</span>
                                 @if (State.FundNote(f.Id) is { Length: > 0 } note)
                                 {
                                     <span class="row-note">· @note</span>
@@ -277,7 +277,7 @@ else
                                     <button class="exp-edit" title="@Loc["Edit"]" @onclick="() => OpenEditDeposit(c.Id)">✏️</button>
                                     <button class="exp-edit" title="@Loc["Remove"]" @onclick="() => OpenDeleteDeposit(c.Id)">🗑️</button>
                                 }
-                                <span>@c.Date.ToString("dd MMM") · @State.MemberName(c.MemberId) · @State.ContributionCategoryName(c.CategoryId) · @State.FundName(c.FundId)</span>
+                                <span>@c.Date.ToString("dd MMM") · @State.MemberName(c.MemberId) · @State.ContributionCategoryName(c.CategoryId) · 🏦 @State.FundName(c.FundId)</span>
                             </span>
                             <span class="amt">@Fmt(c.Paid)</span>
                         </li>
@@ -323,28 +323,25 @@ else
 
             <section class="panel">
                 <div class="panel-head">
-                    <h2>@(_calendar ? State.Period.From.ToString("MMMM yyyy") : _dayView is { } dh ? dh.ToString("dd MMM yyyy") : Loc["All expenses"])</h2>
-                    <span class="exp-views">
-                        @if (!_calendar && _dayView is { } dv)
-                        {
-                            <span class="day-nav">
-                                <button class="exp-edit" title="@Loc["Previous day"]" @onclick="PrevDay" disabled="@(dv <= State.Period.From)">◀</button>
-                                <input type="date" @bind:get="dv" @bind:set="GoToDay" min="@State.Period.From.ToString("yyyy-MM-dd")" max="@State.Period.To.ToString("yyyy-MM-dd")" />
-                                <button class="exp-edit" title="@Loc["Next day"]" @onclick="NextDay" disabled="@(dv >= State.Period.To)">▶</button>
-                                <button class="link" @onclick="() => _dayView = null">@Loc["All days"]</button>
-                            </span>
-                        }
-                        <span class="view-toggle">
-                            <button class="view-btn @(_calendar ? "" : "active")" title="@Loc["List"]" @onclick="() => _calendar = false">☰</button>
-                            <button class="view-btn @(_calendar ? "active" : "")" title="@Loc["Calendar"]" @onclick="ShowCalendar">📅</button>
+                    @if (_calendar)
+                    {
+                        <h2>@State.Period.From.ToString("MMMM yyyy")</h2>
+                    }
+                    else if (_dayView is { } dv)
+                    {
+                        <span class="day-nav">
+                            <button class="exp-edit" title="@Loc["Previous day"]" @onclick="PrevDay" disabled="@(dv <= State.Period.From)">◀</button>
+                            <input type="date" @bind:get="dv" @bind:set="GoToDay" min="@State.Period.From.ToString("yyyy-MM-dd")" max="@State.Period.To.ToString("yyyy-MM-dd")" />
+                            <button class="exp-edit" title="@Loc["Next day"]" @onclick="NextDay" disabled="@(dv >= State.Period.To)">▶</button>
                         </span>
-                    </span>
+                    }
+                    <button class="view-btn @(_calendar ? "active" : "")" title="@Loc["Calendar"]" @onclick="ToggleCalendar">📅</button>
                 </div>
                 @{
                     RenderFragment<FinApp.Domain.Budgeting.Expense> row = e =>
                         @<li>
                             <span>
-                                @State.CategoryName(e.CategoryId) · @State.FundName(e.FundId)@(e.IsFromSavings ? " · 💰saving" : "")@(string.IsNullOrEmpty(e.Note) ? "" : $" · {e.Note}")
+                                @State.CategoryName(e.CategoryId) · 🏦 @State.FundName(e.FundId)@(e.IsFromSavings ? " · 💰saving" : "")@(string.IsNullOrEmpty(e.Note) ? "" : $" · {e.Note}")
                                 @if (e.IsSettlementSource)
                                 {
                                     <span class="settle-tag" title="@Loc["Settled onto another account"]">🤝 @Fmt(e.SettledMoney) → @State.AccountName(e.SettledToAccountId!.Value)</span>
@@ -391,13 +388,20 @@ else
                                 + (inRange ? "" : " cal-out")
                                 + (d == calToday ? " cal-today" : "")
                                 + (_dayView == d ? " cal-sel" : "");
-                            <button class="@cls" disabled="@(!inRange)" @onclick="() => OpenDayFromCalendar(d)">
-                                <span class="cal-num">@d.Day</span>
+                            var day = d;
+                            <div class="@cls" @onclick="() => OpenDayFromCalendar(day)">
+                                <span class="cal-top">
+                                    <span class="cal-num">@d.Day</span>
+                                    @if (inRange && State.IsPeriodOpen)
+                                    {
+                                        <button class="cal-add" title="@Loc["Add expense"]" @onclick:stopPropagation="true" @onclick="() => OpenAddExpenseOn(day)">🧾</button>
+                                    }
+                                </span>
                                 @if (inRange && info.Count > 0)
                                 {
                                     <span class="cal-total">@Fmt(State.Money(info.Total))</span>
                                 }
-                            </button>
+                            </div>
                         }
                     </div>
                 }
@@ -1311,6 +1315,7 @@ else
     private void ShowExpensesTab()
     {
         _tab = Tab.Expenses;
+        _calendar = false;
         _dayView = ClampToPeriod(DateOnly.FromDateTime(DateTime.Today));
     }
 
@@ -1343,8 +1348,22 @@ else
         for (var d = start; d <= end; d = d.AddDays(1)) yield return d;
     }
 
-    private void ShowCalendar() { _calendar = true; _dayView = null; }
+    private void ToggleCalendar()
+    {
+        _calendar = !_calendar;
+        if (!_calendar && _dayView is null) _dayView = ClampToPeriod(DateOnly.FromDateTime(DateTime.Today));
+    }
     private void OpenDayFromCalendar(DateOnly d) { _calendar = false; GoToDay(d); }
+
+    /// <summary>Open the add-expense modal pre-dated to a specific calendar day.</summary>
+    private void OpenAddExpenseOn(DateOnly d)
+    {
+        _categoryId = State.AllCategories.FirstOrDefault()?.Id ?? Guid.Empty;
+        _amount = 0; _note = null; _onBehalfOther = false;
+        _expenseDate = ClampToPeriod(d);
+        _fundId = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
+        _modal = Modal.AddExpense;
+    }
 
     private void ResetPickers()
     {
@@ -1822,9 +1841,9 @@ else
     /// <summary>This period's fund-to-fund transfers and out-to-account transfers, merged newest-first.</summary>
     private List<(DateOnly Date, string Label, Money Amount, Guid Id, bool IsExternal, string? Note)> MergedTransfers() =>
         State.FundTransfers
-            .Select(t => (t.Date, Label: $"{State.FundName(t.FromFundId)} → {State.FundName(t.ToFundId)}", t.Amount, t.Id, IsExternal: false, t.Note))
+            .Select(t => (t.Date, Label: $"🏦 {State.FundName(t.FromFundId)} → 🏦 {State.FundName(t.ToFundId)}", t.Amount, t.Id, IsExternal: false, t.Note))
             .Concat(State.ExternalTransfers
-                .Select(t => (t.Date, Label: $"📤 {State.FundName(t.FundId)} → {State.AccountName(t.ToAccountId ?? Guid.Empty)}", t.Amount, t.Id, IsExternal: true, t.Note)))
+                .Select(t => (t.Date, Label: $"🏦 {State.FundName(t.FundId)} 📤 {State.AccountName(t.ToAccountId ?? Guid.Empty)}", t.Amount, t.Id, IsExternal: true, t.Note)))
             .OrderByDescending(t => t.Date)
             .ToList();
 
