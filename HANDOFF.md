@@ -156,9 +156,9 @@ impossible; everything else warns.** This is a self-contained commit — `git re
 - **Logo loaders:** initial load shows a bobbing `BudgieLogo` + "Loading…"; the Saving pill shows a small spinning budgie
   (scoped CSS uses `::deep .budgie-logo`; reuses `budgie-bob`, adds `budgie-spin`).
 - **Budget hint simplified** — dropped the "(your money minus savings…)" parenthetical; just "Available to budget: X".
-- **Expenses list view = grouped-by-date again:** `ShowExpensesTab`/`ShowDayList` set `_dayView = null` → the grouped
-  all-dates list (clickable date headers → `GoToDay` drills into the day view). Day view (◀▶) is the drill-in; ☰ returns
-  to grouped, 📅 to calendar. Panel head shows "All expenses" in grouped mode.
+- **Expenses views:** opening the tab defaults to **today's day view** (`ShowExpensesTab` → `_dayView = today`); the ☰
+  List button (`ShowDayList` → `_dayView = null`) shows the **grouped all-dates list** (clickable date headers → `GoToDay`
+  drills into the day view). Day view (◀▶) is the drill-in; 📅 → calendar. Panel head shows "All expenses" in grouped mode.
 - **Fund opening inputs accept `+`/`−` expressions** (e.g. `100+50-20`): inputs are `type=text`, evaluated by new
   `EvalSum(string)`; applies to the Start-next-month per-fund openings and the Add/Edit-fund opening field.
 - **Period dates: removed the 📅 button; the period label itself is now the clickable button** (`.period-btn` → `OpenEditPeriod`).

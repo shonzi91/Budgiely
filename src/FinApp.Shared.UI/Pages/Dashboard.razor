@@ -1354,7 +1354,7 @@ else
     {
         _tab = Tab.Expenses;
         _calendar = false;
-        _dayView = null;   // grouped list of all dates (click a date to drill into the day)
+        _dayView = ClampToPeriod(DateOnly.FromDateTime(DateTime.Today));   // default to today's day view
     }
 
     private DateOnly ClampToPeriod(DateOnly d) =>
