@@ -49,6 +49,18 @@ public sealed class FinAppApiClient(HttpClient http)
     public Task<AccountSnapshot> SaveSnapshotAsync(Guid id, SaveAccountRequest req, CancellationToken ct = default) =>
         SendAsync<AccountSnapshot>(HttpMethod.Put, $"/accounts/{id}/snapshot", req, ct);
 
+    /// <summary>Download the account as an .xlsx (one sheet per period). Returns the bytes + suggested file name.</summary>
+    public async Task<(byte[] Bytes, string FileName)> ExportAccountAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await SendRawAsync(HttpMethod.Get, $"/accounts/{id}/export", null, ct);
+        await EnsureSuccessAsync(response, ct);
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+            ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+            ?? "account.xlsx";
+        return (bytes, fileName);
+    }
+
     // --- Invitations ------------------------------------------------------
     public Task<List<InvitationDto>> GetPendingInvitationsAsync(CancellationToken ct = default) =>
         SendAsync<List<InvitationDto>>(HttpMethod.Get, "/invitations/pending", null, ct);

@@ -56,6 +56,7 @@ else
                     }
                     <button class="link" title="Add a new account" @onclick="OpenAddAccount">➕</button>
                     <button class="link" title="Invite a contributor" @onclick="OpenInvite">👥</button>
+                    <button class="link" title="@Loc["Export to Excel"]" @onclick="ExportAccount">📊</button>
                     @if (State.IsOwnerOfCurrent)
                     {
                         <button class="link" title="Delete account" @onclick="OpenDeleteAccount">🗑️</button>
@@ -2024,6 +2025,13 @@ else
     private void OpenEditAccount() { _fName = State.Account.Name; _modal = Modal.EditAccount; }
     private void OpenDeleteAccount() => _modal = Modal.DeleteAccount;
     private void OpenInvite() { _inviteUsername = null; _inviteMessage = null; _modal = Modal.Invite; }
+
+    private Task ExportAccount() => Run(async () =>
+    {
+        var (bytes, fileName) = await State.ExportCurrentAccountAsync();
+        await JS.InvokeVoidAsync("finappDownloadFile", fileName, Convert.ToBase64String(bytes),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    });
     private void CloseModal() { _modal = Modal.None; _modalError = null; }
 
     private Task SendInvite() => RunModal(async () =>

@@ -70,6 +70,7 @@ builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<SnapshotService>();
+builder.Services.AddScoped<AccountExportService>();
 builder.Services.AddScoped<InvitationService>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<SyncNotifier>();
@@ -212,6 +213,13 @@ accounts.MapPut("/{id:guid}/snapshot", async (Guid id, SaveAccountRequest req, C
     var version = await svc.SaveAsync(user.UserId(), id, req, ct);
     await notifier.AccountChangedAsync(id, user.UserId(), version);
     return Results.Ok(new AccountSnapshot(id, version, req.Payload));
+});
+
+// --- Excel export (one sheet per period) ---------------------------------
+accounts.MapGet("/{id:guid}/export", async (Guid id, ClaimsPrincipal user, AccountExportService svc, CancellationToken ct) =>
+{
+    var (bytes, fileName) = await svc.ExportAsync(user.UserId(), id, ct);
+    return Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
 });
 
 // --- Invitations ---------------------------------------------------------

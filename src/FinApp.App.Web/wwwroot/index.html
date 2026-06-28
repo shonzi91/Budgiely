@@ -23,7 +23,19 @@
         <a class="dismiss">🗙</a>
     </div>
 
-    <script>window.finappViewportWidth = () => window.innerWidth || 0;</script>
+    <script>
+        window.finappViewportWidth = () => window.innerWidth || 0;
+        window.finappDownloadFile = (fileName, base64, contentType) => {
+            const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            const blob = new Blob([bytes], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = fileName;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        };
+    </script>
     <script src="_framework/blazor.webassembly.js"></script>
 
 </body>

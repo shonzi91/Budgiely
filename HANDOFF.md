@@ -162,7 +162,13 @@ impossible; everything else warns.** This is a self-contained commit — `git re
 - **Fund opening inputs accept `+`/`−` expressions** (e.g. `100+50-20`): inputs are `type=text`, evaluated by new
   `EvalSum(string)`; applies to the Start-next-month per-fund openings and the Add/Edit-fund opening field.
 - **Period dates: removed the 📅 button; the period label itself is now the clickable button** (`.period-btn` → `OpenEditPeriod`).
-- **Still TODO (asked, not yet built): Excel import/export per account, one sheet per period** — see roadmap entry below.
+- **Excel export per account** — done in Session 11k below (import still pending).
+
+### Session 11k — Excel export per account (server-side, one sheet per period). 106 tests (21 server).
+Added `ClosedXML` to `FinApp.Server`; new `AccountExportService` + `GET /accounts/{id}/export` (contributor-only) builds
+an "Account" overview sheet + a sheet per period. Client downloads via `FinAppApiClient.ExportAccountAsync` → JS
+`finappDownloadFile`; 📊 button in the account-ops bar. `ExportApiTests` validates a real xlsx is produced.
+**Import is the remaining half** — see the roadmap entry (decide replace-vs-merge + id alignment).
 
 ## Session 10 (2026-06-25) — branding, polish, data import, perf
 All on `main`, deployed (latest revision ~finapp-00021). Highlights since the 06-24 debt cleanup:
@@ -733,8 +739,15 @@ to keep spending within what remains.
   relabels "Current" as spendable when the flag is on. **Confirm scope before starting — it's a model-level change.**
 
 ### (NEW) Excel import/export per account — one sheet per period
-Added 2026-06-26 at the user's request. Export an account to an `.xlsx` (a sheet per period: opening balances,
-contributions, budgets, expenses, savings, transfers) and re-import it. **Decision needed: where to compute.**
+**Export ✅ DONE (Session 11k, server-side ClosedXML).** Import still TODO. Export an account to an `.xlsx` (a sheet per
+period: opening balances, contributions, budgets, expenses, savings, transfers) and re-import it. **Decision needed for import: where to compute.**
+
+**Export (done):** `GET /accounts/{id}/export` → `AccountExportService` (server) deserializes the snapshot via
+`AccountSnapshotSerializer` and builds the workbook with **ClosedXML** (added to `FinApp.Server`; v0.105). One "Account"
+overview sheet + a sheet per period (named `NN yyyy-MM`). Client: `FinAppApiClient.ExportAccountAsync` downloads the
+authorized bytes; `Dashboard.ExportAccount` → JS `finappDownloadFile` (base64→Blob→anchor) saves the file. UI: 📊 button
+in the account-ops bar. Tests: `ExportApiTests` (real xlsx via `PK` header; empty account → 404). 21 server tests.
+**Import (TODO):**
 - **Option A — server-side (recommended, simplest):** add `GET /accounts/{id}/export` (build workbook with **ClosedXML**;
   server can deserialize the snapshot via `AccountSnapshotSerializer` in Contracts) and `POST /accounts/{id}/import`
   (parse → rebuild account → save snapshot). Download via a normal link; upload via a file input. **Tension:** the server

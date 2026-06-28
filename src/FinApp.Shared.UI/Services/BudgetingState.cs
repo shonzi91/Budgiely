@@ -618,6 +618,9 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     public string AccountName(Guid accountId) =>
         _summaries.FirstOrDefault(a => a.Id == accountId)?.Name ?? "another account";
 
+    /// <summary>Download the current account as an .xlsx (one sheet per period). Returns the file bytes + name.</summary>
+    public Task<(byte[] Bytes, string FileName)> ExportCurrentAccountAsync() => api.ExportAccountAsync(CurrentAccountId);
+
     public ExternalTransfer? FindExternalTransfer(Guid id) =>
         Period.ExternalTransfers.FirstOrDefault(t => t.Id == id);
 
