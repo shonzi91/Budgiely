@@ -65,6 +65,9 @@ public sealed class Localizer(IJSRuntime js)
         // Auth
         ["Private, shared budgeting. Sign in or create an account to begin."] =
             "Личен, споделен бюджет. Влез или създай профил, за да започнеш.",
+        ["Track together, save together."] = "Следете заедно, спестявайте заедно.",
+        ["Simple family goals, zero stress. Sign in or create an account to begin."] =
+            "Прости семейни цели, нула стрес. Влез или създай профил, за да започнеш.",
         ["Sign in"] = "Вход",
         ["Create account"] = "Създай профил",
         ["Username or email"] = "Потребител или имейл",

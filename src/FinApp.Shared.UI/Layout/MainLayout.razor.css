@@ -11,7 +11,7 @@
     display: flex;
     align-items: center;
     padding: 0 18px;
-    background: #4f46e5;
+    background: #13a06e;
     color: #fff;
 }
 
@@ -74,10 +74,10 @@
 .pm-ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
 .pm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .pm-actions button {
-    padding: 9px 16px; border: none; border-radius: 10px; background: #4f46e5; color: #fff; font-weight: 600; cursor: pointer;
+    padding: 9px 16px; border: none; border-radius: 10px; background: #13a06e; color: #fff; font-weight: 600; cursor: pointer;
 }
 .pm-actions button:disabled { background: #c7c9d6; cursor: not-allowed; }
-.pm-actions button.ghost { background: #eef0fb; color: #4f46e5; }
+.pm-actions button.ghost { background: #e4f6ee; color: #13a06e; }
 
 .appbar-user .link {
     background: rgba(255, 255, 255, .15);

@@ -8,8 +8,8 @@
         <button class="flag @(Loc.Culture == "bg" ? "active" : "")" title="Български" @onclick='() => Loc.SetCultureAsync("bg")'>🇧🇬</button>
     </div>
     <h1 class="auth-brand"><span class="auth-logo"><BudgieLogo /></span> Budgiely</h1>
-    <p class="auth-slogan">@Loc["Budget like a budgie."]</p>
-    <p class="hint">@Loc["Private, shared budgeting. Sign in or create an account to begin."]</p>
+    <p class="auth-slogan">@Loc["Track together, save together."]</p>
+    <p class="hint">@Loc["Simple family goals, zero stress. Sign in or create an account to begin."]</p>
 
     <div class="auth-tabs">
         <button class="tab @(_mode == Mode.Login ? "active" : "")" @onclick="() => Switch(Mode.Login)">@Loc["Sign in"]</button>

@@ -1,7 +1,9 @@
 ﻿/*#if (SampleContent)*/
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: 'Quicksand', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+/* Warm, family-friendly page background (cards stay white for contrast). */
+body { background: #fbf7ef; }
 
 /* Always reserve the scrollbar gutter so switching to a taller tab (e.g. Budgets) doesn't add a scrollbar
    and shift the centered layout sideways. */

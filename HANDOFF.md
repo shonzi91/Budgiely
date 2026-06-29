@@ -170,6 +170,20 @@ an "Account" overview sheet + a sheet per period. Client downloads via `FinAppAp
 `finappDownloadFile`; 📊 button in the account-ops bar. `ExportApiTests` validates a real xlsx is produced.
 **Import is the remaining half** — see the roadmap entry (decide replace-vs-merge + id alignment).
 
+### Session 11l — family-friendly visual refresh (mint + cream, Quicksand, mint logo, new tagline). UI-only.
+- **Palette → mint/cream.** Swept the whole indigo family → mint across all scoped CSS (PowerShell map: `#4f46e5→#13a06e`,
+  `#4338ca→#0e7c55`, `#eef0fb→#e4f6ee`, + ~10 tints + the `rgba(79,70,229,…)` shadows). Red/amber/green semantics kept;
+  savings/success greens were already green so it's cohesive. Page background warmed to cream (`body{background:#fbf7ef}` in
+  `app.css`). **To recolor again, re-run the same map** — colors are still hardcoded hex, not CSS variables (worthwhile future cleanup).
+- **Font → Quicksand** (Google Fonts link in `index.html`; `font-family` set in scoped CSS + `app.css`). Numbers kept legible
+  via `font-variant-numeric: tabular-nums` on `.dash` (honest fix — Quicksand's geometric digits scan poorly otherwise).
+- **Logo recolored** to a mint gradient (`BudgieLogo.razor`). **Tagline** → "Track together, save together." + hint
+  "Simple family goals, zero stress." (`AuthPanel`, `<title>`); BG translations added.
+- **Cache:** bumped `app.css?v=3` (not fingerprinted — bump on every global-CSS change).
+- **NOT done (flagged): per-member pastel accent colors** — a real feature (store a color on `AccountMember` →
+  serializer/EF, then paint contributions/avatars), not a CSS tweak; natural next step. No App Store listing exists yet
+  (web on Cloud Run; MAUI unpublished) — only the in-app tagline/title were updated.
+
 ## Session 10 (2026-06-25) — branding, polish, data import, perf
 All on `main`, deployed (latest revision ~finapp-00021). Highlights since the 06-24 debt cleanup:
 - **Rebrand → Budgiely:** `BudgieLogo.razor` (SVG budgie with a €-coin belly) in the app bar + sign-in screen;

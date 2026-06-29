@@ -33,19 +33,19 @@
     background: none; border: none; cursor: pointer; font-size: .9rem;
     padding: 3px 5px; border-radius: 6px; line-height: 1;
 }
-.tree-actions button:hover { background: #eef0fb; }
+.tree-actions button:hover { background: #e4f6ee; }
 .tree-actions button.add-exp {
-    font-size: .75rem; font-weight: 600; color: #4f46e5; background: #eef0fb;
+    font-size: .75rem; font-weight: 600; color: #13a06e; background: #e4f6ee;
     padding: 4px 9px; white-space: nowrap;
 }
-.tree-actions button.add-exp:hover { background: #e0e3f7; }
+.tree-actions button.add-exp:hover { background: #d6efe3; }
 
 .exp-toggle {
     background: none; border: none; cursor: pointer;
     color: #6b7280; font-size: .76rem; font-weight: 600;
     padding: 2px 6px 6px; line-height: 1;
 }
-.exp-toggle:hover { color: #4f46e5; }
+.exp-toggle:hover { color: #13a06e; }
 
 .tree-expenses {
     list-style: none; margin: 0 0 4px; padding: 0;
@@ -62,7 +62,7 @@
     background: none; border: none; cursor: pointer; font-size: .8rem;
     padding: 2px 4px; border-radius: 6px; line-height: 1;
 }
-.exp-edit:hover { background: #eef0fb; }
+.exp-edit:hover { background: #e4f6ee; }
 
 @media (max-width: 720px) {
     /* Drop the progress bar on phones; keep name | ratio | add-expense | % aligned. */
