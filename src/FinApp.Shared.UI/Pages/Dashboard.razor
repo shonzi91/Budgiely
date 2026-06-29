@@ -6,21 +6,21 @@
 
 @if (_busy)
 {
-    <div class="saving-pill"><span class="pill-budgie"><BudgieLogo /></span> @Loc["Saving…"]</div>
+    <div class="saving-pill"><span class="pill-budgie"><TandemLogo /></span> @Loc["Saving…"]</div>
 }
 
 @if (!State.IsReady)
 {
     <div class="loading">
-        <div class="loading-budgie"><BudgieLogo /></div>
+        <div class="loading-budgie"><TandemLogo /></div>
         <span>@Loc["Loading…"]</span>
     </div>
 }
 else if (!State.HasAccounts)
 {
     <div class="firstrun">
-        <div class="firstrun-mascot"><BudgieLogo /></div>
-        <h1>@Loc["Welcome to Budgiely"]</h1>
+        <div class="firstrun-mascot"><TandemLogo /></div>
+        <h1>@Loc["Welcome to TandemTab"]</h1>
         <p class="firstrun-lead">@Loc["Let’s feather your nest. Create your first account to get started (e.g. Personal, Shared, Family)."]</p>
         <InvitationsPanel />
         @if (_error is not null)

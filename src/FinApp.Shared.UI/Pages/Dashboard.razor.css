@@ -90,7 +90,7 @@
     display: inline-flex; align-items: center; gap: 6px;
 }
 .pill-budgie { display: inline-flex; width: 18px; height: 18px; }
-.pill-budgie ::deep .budgie-logo { width: 18px; height: 18px; animation: budgie-spin 1s linear infinite; }
+.pill-budgie ::deep .tandem-logo { width: 18px; height: 18px; animation: budgie-spin 1s linear infinite; }
 @keyframes budgie-spin { to { transform: rotate(360deg); } }
 
 .panel {
@@ -150,7 +150,7 @@
 
 .loading { padding: 64px 40px; text-align: center; color: #6b7280; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .loading-budgie { width: 56px; height: 56px; animation: budgie-bob 1.4s ease-in-out infinite; }
-.loading-budgie ::deep .budgie-logo { width: 56px; height: 56px; }
+.loading-budgie ::deep .tandem-logo { width: 56px; height: 56px; }
 
 .firstrun {
     max-width: 460px; margin: 8vh auto 0; padding: 28px; text-align: center;

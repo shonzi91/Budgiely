@@ -1,15 +1,14 @@
-<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Budgiely">
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TandemTab">
     <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#8b5cf6" />
-            <stop offset="1" stop-color="#4f46e5" />
+        <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#34d399" />
+            <stop offset="1" stop-color="#13a06e" />
         </linearGradient>
     </defs>
-    <rect width="40" height="40" rx="10" fill="url(#bg)" />
-    <path d="M14 8c6 0 10 4 10 10 0 2.4-.7 4.3-1.8 5.9 1.6 1.6 2.6 3.6 2.7 6-2.7 0-5.3-1-7.2-2.7-.9.2-1.8.3-2.7.3C9 27.6 4.5 23.1 4.5 17.3 4.5 11.2 8.7 8 14 8Z" fill="#fff" />
-    <path d="M4.5 15.5.5 16.6l4 2.5z" fill="#fbbf24" />
-    <circle cx="10" cy="14.4" r="2.3" fill="#4f46e5" />
-    <circle cx="9.3" cy="14.4" r="1" fill="#241c3a" />
-    <path d="M19.4 18.6a2.7 2.7 0 1 0 0 5.2" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-linecap="round" />
-    <path d="M15 20.2h4M15 22.2h4" stroke="#7c3aed" stroke-width="1.5" stroke-linecap="round" />
+    <rect width="64" height="64" rx="16" fill="url(#bg)" />
+    <rect x="14" y="24" width="36" height="8" rx="4" fill="#fff" />
+    <rect x="21" y="29" width="8" height="22" rx="4" fill="#fff" />
+    <rect x="35" y="29" width="8" height="22" rx="4" fill="#fff" />
+    <circle cx="25" cy="17" r="5.5" fill="#fff" />
+    <circle cx="39" cy="17" r="5.5" fill="#fff" />
 </svg>

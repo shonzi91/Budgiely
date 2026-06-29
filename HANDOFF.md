@@ -1,9 +1,10 @@
 # Budgiely (FinApp) — session handoff
 
 Last updated: 2026-06-26 (Session 11). Read this + [README.md](README.md) + recent `git log` to catch up.
-Product is now branded **Budgiely** 🐤 ("Budget like a budgie."); **code namespaces/assemblies stay `FinApp.*`**
-(product name ≠ assembly name — not worth a full rename). Live on Cloud Run, all on `origin/main` (GitHub
-shonzi91/FinApp — **repo not yet renamed to Budgiely**; user to do it in Settings, then repoint the remote).
+Product is now branded **TandemTab** ("Track together, save together.") — renamed from Budgiely in Session 11m.
+Logo = a mint **TT / two-figures-on-a-beam** monogram (`Components/TandemLogo.razor`, was `BudgieLogo`). **Code
+namespaces/assemblies stay `FinApp.*`** (product name ≠ assembly name — not worth a full rename). Live on Cloud Run, all
+on `origin/main` (GitHub shonzi91/FinApp — **repo not yet renamed**; user to do it in Settings, then repoint the remote).
 
 **Current state (2026-06-26):** live as **revision finapp-00032**; **104 tests pass** (80 domain + 5 persistence + 19 server).
 Session 11 ran long with many sub-sessions (11a–11i below) — money-model reshaping + UI polish. Money model now:
@@ -169,6 +170,13 @@ Added `ClosedXML` to `FinApp.Server`; new `AccountExportService` + `GET /account
 an "Account" overview sheet + a sheet per period. Client downloads via `FinAppApiClient.ExportAccountAsync` → JS
 `finappDownloadFile`; 📊 button in the account-ops bar. `ExportApiTests` validates a real xlsx is produced.
 **Import is the remaining half** — see the roadmap entry (decide replace-vs-merge + id alignment).
+
+### Session 11m — renamed Budgiely → TandemTab + new logo. UI-only.
+Logo component `BudgieLogo.razor` → **`TandemLogo.razor`** (git mv), SVG replaced with the chosen **TT monogram** (two heads
+on a shared beam = two figures / two T's), mint gradient. Updated all `<BudgieLogo />` usages (AuthPanel, MainLayout app bar,
+Dashboard loaders + firstrun), the `.budgie-logo`→`.tandem-logo` CSS selectors, `favicon.svg`, `<title>`, brand text
+("Budgiely"→"TandemTab"), and the "Welcome to…" Loc key. **Logo enlarged** (app bar 26→38px, sign-in 44→64px). The budgie
+mascot is fully retired (the pun belonged to the old name). README/MAUI host title still say Budgiely — non-user-facing, update if you like.
 
 ### Session 11l — family-friendly visual refresh (mint + cream, Quicksand, mint logo, new tagline). UI-only.
 - **Palette → mint/cream.** Swept the whole indigo family → mint across all scoped CSS (PowerShell map: `#4f46e5→#13a06e`,

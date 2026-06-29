@@ -88,7 +88,7 @@ public sealed class Localizer(IJSRuntime js)
         ["Budget like a budgie."] = "Бюджет, лек като перце.",
 
         // First run
-        ["Welcome to Budgiely"] = "Добре дошъл в Budgiely",
+        ["Welcome to TandemTab"] = "Добре дошъл в TandemTab",
         ["Let’s feather your nest. Create your first account to get started (e.g. Personal, Shared, Family)."] =
             "Да подредим гнездото. Създай първия си профил, за да започнеш (напр. Личен, Споделен, Семеен).",
         ["Ruffled feathers — overspent by"] = "Разрошени пера — преразход с",

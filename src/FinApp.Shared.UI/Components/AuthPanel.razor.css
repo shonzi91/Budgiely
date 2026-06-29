@@ -46,9 +46,9 @@
 }
 .auth-brand { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .auth-logo {
-    width: 44px; height: 44px; flex: 0 0 auto;
+    width: 64px; height: 64px; flex: 0 0 auto;
     background: linear-gradient(135deg, #eef9f3, #e4f6ee);
-    border: 1px solid #d6f0e3; border-radius: 13px; padding: 5px;
+    border: 1px solid #d6f0e3; border-radius: 18px; padding: 7px;
     display: grid; place-items: center;
 }
 .auth-logo ::deep svg { width: 100%; height: 100%; display: block; }
