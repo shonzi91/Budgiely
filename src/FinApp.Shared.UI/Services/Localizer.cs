@@ -275,6 +275,8 @@ public sealed class Localizer(IJSRuntime js)
         ["Auto (from name)"] = "Автоматично (по име)",
         ["Language"] = "Език",
         ["Profile picture"] = "Профилна снимка",
+        ["Appearance"] = "Облик",
+        ["Dark theme"] = "Тъмна тема",
         ["Upload"] = "Качи",
         ["Stored on this device only."] = "Запазва се само на това устройство.",
         ["Sub-categories"] = "Подкатегории",

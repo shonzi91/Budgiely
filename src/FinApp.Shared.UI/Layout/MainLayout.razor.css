@@ -65,6 +65,8 @@
 .pm h3 { margin: 0; font-size: 1.05rem; }
 .pm h4 { margin: 6px 0 0; font-size: .9rem; color: #6b7280; }
 .pm-who { margin: 0; font-size: .8rem; color: #9ca3af; }
+.pm-theme-row { display: flex; align-items: center; justify-content: space-between; font-size: .9rem; cursor: pointer; }
+.pm-theme-row input { width: auto; }
 .pm-hint { margin: 0; font-size: .72rem; color: #9ca3af; }
 .pm-avatar-row { display: flex; align-items: center; gap: 12px; }
 .pm-avatar {

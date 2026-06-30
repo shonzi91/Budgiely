@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="FinApp.App.Maui.styles.css" />
+    <script>
+        try { if (localStorage.getItem('finapp-theme') === 'dark') document.documentElement.classList.add('dark'); } catch (e) { }
+    </script>
     <link rel="icon" href="data:,">
 </head>
 
@@ -24,6 +27,12 @@
     </div>
 
     <script>
+        window.finappGetTheme = () => { try { return localStorage.getItem('finapp-theme') || 'light'; } catch (e) { return 'light'; } };
+        window.finappSetTheme = (theme) => {
+            const dark = theme === 'dark';
+            document.documentElement.classList.toggle('dark', dark);
+            try { localStorage.setItem('finapp-theme', dark ? 'dark' : 'light'); } catch (e) { }
+        };
         window.finappPickImage = () => new Promise(resolve => {
             const input = document.createElement('input');
             input.type = 'file'; input.accept = 'image/*';

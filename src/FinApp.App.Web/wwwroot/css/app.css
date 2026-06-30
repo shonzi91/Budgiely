@@ -95,3 +95,76 @@ h1:focus {
         padding-left: env(safe-area-inset-left);
     }
 }
+
+/* ─────────────────────────── DARK THEME ───────────────────────────
+   The app's colours are hardcoded hex inside scoped component CSS. Rather than
+   re-theme every file, this layer overrides the structural surfaces/text from a
+   global sheet: an `html.dark X` selector outranks the scoped `X[b-hash]` rule by
+   one element of specificity, so these win. Mint accent (#13a06e) is kept as-is. */
+html.dark { color-scheme: dark; }
+html.dark body { background: #0f1117; }
+html.dark .app-shell { background: #0f1117; }
+html.dark .app-body { background: #0f1117; }
+
+/* Base + heading text */
+html.dark .dash { color: #e8eaf0; }
+html.dark .dash h1, html.dark .dash h2, html.dark .dash h3, html.dark .dash h4,
+html.dark .panel h2, html.dark .card-value, html.dark .ring-name, html.dark .insight-title,
+html.dark .breakdown-name, html.dark .fund-name, html.dark .row-main, html.dark .amt,
+html.dark .pm h3, html.dark .pm h4 { color: #e8eaf0; }
+
+/* Secondary / muted text */
+html.dark .card-label, html.dark .card-sub, html.dark .insight-desc, html.dark .insight-h,
+html.dark .ring-muted, html.dark .ring-sub, html.dark .ring-label, html.dark .row-note,
+html.dark .spending-sub, html.dark .trend-note, html.dark .score-line, html.dark .bal-label,
+html.dark .bal-free, html.dark .hint, html.dark .savings-target, html.dark .mini-bar-month,
+html.dark .trend-labels span, html.dark .person, html.dark .acct-menu-note, html.dark .day-nav,
+html.dark .pm-who, html.dark .pm-hint, html.dark .period, html.dark .period-btn,
+html.dark .savings-footer span { color: #aab0c0; }
+
+/* Surfaces (cards, panels, modals, popovers) */
+html.dark .card, html.dark .panel, html.dark .modal, html.dark .score-card, html.dark .insight,
+html.dark .win, html.dark .row-menu, html.dark .acct-menu-pop, html.dark .langpick-menu,
+html.dark .home-more-toggle, html.dark .pm, html.dark .breakdown-card, html.dark .savings-rate-card,
+html.dark .trend-card {
+    background: #181c25; border-color: #262d3d; color: #e8eaf0;
+}
+html.dark .card.savings, html.dark .all-clear { background: #14271f; border-color: #1d3a2c; }
+html.dark .modal-backdrop, html.dark .pm-backdrop { background: rgba(0,0,0,.6); }
+
+/* Form controls */
+html.dark input, html.dark select, html.dark textarea {
+    background: #1e2330; color: #e8eaf0; border-color: #262d3d;
+}
+html.dark input[type=date] { color-scheme: dark; }
+
+/* Tabs + list separators + tracks */
+html.dark .tabs { border-bottom-color: #262d3d; }
+html.dark .tab { color: #aab0c0; }
+html.dark .list li { border-bottom-color: #262d3d; }
+html.dark .breakdown-bar-bg, html.dark .savings-track, html.dark .pring-track,
+html.dark .gauge-track, html.dark .score-bar-track { background: #262d3d; }
+html.dark .pring-track { stroke: #262d3d; }
+html.dark .gauge-track { stroke: #262d3d; }
+html.dark .trend-bar { background: #2a3045; }
+
+/* Utility / icon buttons → dark surface */
+html.dark .nav, html.dark .ghost, html.dark .icon-opt, html.dark .ring-plus, html.dark .view-btn,
+html.dark .lbl-add, html.dark .home-more-toggle,
+html.dark .acct-menu-pop button, html.dark .row-menu button, html.dark .langpick-item,
+html.dark .pm-actions button.ghost, html.dark .modal-actions button.ghost {
+    background: #1e2330; color: #e8eaf0; border-color: #262d3d;
+}
+html.dark .exp-edit { color: #e8eaf0; }
+html.dark .ring-expense { background: #14352a; border-color: #1d3a2c; }
+html.dark button.link, html.dark .period-btn { background: none; color: #2bbd86; }
+html.dark .view-btn.active { background: #14352a; color: #2bbd86; }
+html.dark .acct-select { background: #1e2330; color: #e8eaf0; border-color: #262d3d; }
+
+/* Alerts keep their warm tint but darker */
+html.dark .alert { background: #2a2113; border-color: #5a4a1e; color: #f5cf8a; }
+html.dark .warn-bg { background: #2a2113; }
+html.dark .warn-text { color: #f0a85a; }
+
+/* Settings (gear) toggle row */
+html.dark .pm-theme-row { color: #e8eaf0; }

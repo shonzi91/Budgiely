@@ -56,6 +56,23 @@ mint/cream look. **Everything is derived from existing domain reads — no domai
 - **Possible follow-ups:** add an InsightsService unit test (no test project covers Shared.UI today); localize the generated
   sentences; a "How it's calculated" expander for the score; the savings gauge track is fixed at 0–40% (clamps if target > 40%).
 
+## Session 12k (2026-06-30) — dark theme + toggle. UI-only. 114 tests.
+Added a **dark theme** with a toggle in Profile settings.
+- **No CSS-variable refactor** (colours are still hardcoded hex in scoped CSS). Instead a **global dark override layer** in
+  `App.Web/wwwroot/css/app.css` (and mirrored in `App.Maui/wwwroot/css/app.css`): `html.dark X` selectors **outrank** the
+  scoped `X[b-hash]` rules by one element of specificity, so they win without touching component files. Re-themes the
+  structural surfaces (cards/panels/modals/menus/inputs), text (primary/secondary), borders, tracks, tabs, list separators,
+  utility buttons, alerts. **Mint accent (#13a06e) and the mint app-bar are kept** in both themes. Palette: page #0f1117,
+  surface #181c25, input #1e2330, border #262d3d, text #e8eaf0 / muted #aab0c0.
+- **Toggle:** `<html class="dark">` driven by JS `finappSetTheme('dark'|'light')` + `finappGetTheme()` (in both index.html
+  hosts), persisted in `localStorage['finapp-theme']`. An **early inline script in `<head>` applies the saved theme before
+  first paint** (no light flash). MainLayout profile modal has an **"Appearance → Dark theme"** checkbox (`_dark`, `ToggleTheme`).
+  `app.css` cache-bust bumped to **`?v=4`** (web).
+- **Files:** both `wwwroot/index.html` + `wwwroot/css/app.css`, `Layout/MainLayout.razor`(+`.css`), `Services/Localizer.cs`
+  (Appearance, Dark theme). No domain/server changes. 114 tests. NOTE: dark CSS is a broad override list, not exhaustive —
+  expect a few spots needing touch-ups; add `html.dark <class>` rules in app.css (both hosts) to fix. To re-sync MAUI's block
+  from web after editing: strip from MAUI's "DARK THEME" marker to EOF and re-append the web file's block.
+
 ## Session 12j (2026-06-30) — row "⋯" menus, Money tab, ring expense buttons, real-user People. UI-only. 114 tests.
 Five polish items on top of the 4-tab simplification:
 1. **Per-row "⋯" action menus.** Funds and Income (contributions) rows collapsed their inline ✏️🗑️🔁➕ into a single

@@ -49,6 +49,11 @@
             <div class="pm">
                 <h3>@Loc["Profile settings"]</h3>
                 <p class="pm-who">@Auth.CurrentUser!.Username · @Auth.CurrentUser!.Email</p>
+                <h4>@Loc["Appearance"]</h4>
+                <label class="pm-theme-row">
+                    <span>@Loc["Dark theme"]</span>
+                    <input type="checkbox" checked="@_dark" @onchange="ToggleTheme" />
+                </label>
                 <h4>@Loc["Profile picture"]</h4>
                 <div class="pm-avatar-row">
                     <span class="pm-avatar">
@@ -95,6 +100,7 @@
 @code {
     private bool _restored;
     private bool _avatarBusy;
+    private bool _dark;
     private string? _avatarError;
     private string Initial => (Auth.CurrentUser?.Username ?? "?").Trim() is { Length: > 0 } u ? u[..1].ToUpperInvariant() : "?";
 
@@ -129,9 +135,16 @@
         try { await Auth.TryRestoreAsync(); }
         catch { /* server unreachable on startup — fall through to the sign-in screen */ }
         _restored = true;
+        try { _dark = (await JS.InvokeAsync<string>("finappGetTheme")) == "dark"; } catch { /* host without the helper */ }
     }
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task ToggleTheme(ChangeEventArgs e)
+    {
+        _dark = e.Value is true;
+        try { await JS.InvokeVoidAsync("finappSetTheme", _dark ? "dark" : "light"); } catch { /* ignore */ }
+    }
 
     // --- Profile picture (stored on the server, per user; syncs across devices) ---
 

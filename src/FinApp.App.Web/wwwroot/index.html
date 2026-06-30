@@ -9,9 +9,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css?v=3" />
+    <link rel="stylesheet" href="css/app.css?v=4" />
     <link rel="stylesheet" href="FinApp.App.Web.styles.css" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script>
+        // Apply the saved theme before first paint to avoid a light flash.
+        try { if (localStorage.getItem('finapp-theme') === 'dark') document.documentElement.classList.add('dark'); } catch (e) { }
+    </script>
 </head>
 
 <body>
@@ -28,6 +32,12 @@
 
     <script>
         window.finappViewportWidth = () => window.innerWidth || 0;
+        window.finappGetTheme = () => { try { return localStorage.getItem('finapp-theme') || 'light'; } catch (e) { return 'light'; } };
+        window.finappSetTheme = (theme) => {
+            const dark = theme === 'dark';
+            document.documentElement.classList.toggle('dark', dark);
+            try { localStorage.setItem('finapp-theme', dark ? 'dark' : 'light'); } catch (e) { }
+        };
         window.finappPickImage = () => new Promise(resolve => {
             const input = document.createElement('input');
             input.type = 'file'; input.accept = 'image/*';
