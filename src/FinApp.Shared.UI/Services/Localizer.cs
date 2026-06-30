@@ -190,6 +190,9 @@ public sealed class Localizer(IJSRuntime js)
         ["Previous period"] = "Предишен период",
         ["Next period"] = "Следващ период",
         ["Sum of the period's opening fund values"] = "Сбор от началните стойности на фондовете за периода",
+        ["Add bucket"] = "Добави джоб",
+        ["Account actions"] = "Действия с профила",
+        ["to"] = "към",
 
         // Insights / financial-health tab
         ["Your score this period"] = "Вашата оценка за периода",

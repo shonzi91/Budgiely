@@ -489,11 +489,12 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
             throw new InvalidOperationException("You can only change your own contributions.");
     }
 
-    public Task AddContributionCategory(string name, string? icon = null)
+    public async Task<Guid> AddContributionCategory(string name, string? icon = null)
     {
         var c = Account.AddContributionCategory(name);
         Account.SetContributionCategoryIcon(c.Id, icon);
-        return SaveAsync();
+        await SaveAsync();
+        return c.Id;
     }
 
     public Task RenameContributionCategory(Guid id, string name)

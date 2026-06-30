@@ -56,6 +56,24 @@ mint/cream look. **Everything is derived from existing domain reads — no domai
 - **Possible follow-ups:** add an InsightsService unit test (no test project covers Shared.UI today); localize the generated
   sentences; a "How it's calculated" expander for the score; the savings gauge track is fixed at 0–40% (clamps if target > 40%).
 
+## Session 12f (2026-06-30) — navigation declutter: "+" ring tiles, inline-create, account cog menu. UI-only. 112 tests.
+1. **Budgets & Savings panels lost their header rows** (title + ➕); each ring-grid now ends with a **"+" circle tile**
+   (`.ring-plus`) → `OpenAdd(null)` / `OpenAddBucket`. Empty-state hints removed (the + tile is self-explanatory).
+2. **Inline category/fund creation from the dropdowns** (fewer buttons): a small **"+" next to the select label**
+   (`.lbl-add`) — Deposit modal: + by Category (new contribution category) and + by Fund (new fund); Add-expense modal:
+   + by Category (new budget category). Implemented via the modal back-stack + a new `_afterCreate(Guid)` hook: the wrapper
+   pushes "reopen parent" and remembers which field to set, and **`SaveAddCat`/`SaveContribCat`/`SaveFund` now end with
+   `Back()` then `_afterCreate?.Invoke(newId)`** (so after creating, you return to the deposit/expense modal with the new
+   item selected). `Back()` with an empty stack still fully closes, so top-level adds are unchanged.
+   `BudgetingState.AddContributionCategory` now returns `Task<Guid>`.
+3. **Account actions moved into a ⚙️ cog menu** (`.acct-menu` popup, backdrop-closes like the language picker): Rename /
+   Invite / Export / Delete (+ a "shared" note for non-owners). Only ➕ "new account" stays visible beside it. `_acctMenuOpen`
+   + `RunAcct(Action)` + `MenuExport()`.
+4. **Contributions rows read "… Category · to 🏦 Fund"** ("to" before the fund). New Loc key `to`.
+- **Files:** `Shared.UI/Pages/Dashboard.razor`(+`.css`), `Shared.UI/Services/{BudgetingState,Localizer}.cs`. No domain/EF/serializer
+  changes. 112 tests. NOTE: the Account-tab **Funds panel ➕ was kept** (standalone fund add + per-fund ✏️/🗑️ live there); the
+  Deposit-modal "+" is an additional quick path. Contribution-category management (rename/remove) still lives in the 🏷️ Manage modal.
+
 ## Session 12e (2026-06-30) — budgets-tab dashed rings, modal nav, avatars in lists, full i18n, flag picker. UI-only. 112 tests.
 Seven requests, all presentation-layer (no domain/serializer/EF changes):
 1. **Budgets tab shows non-budgeted categories** as dashed rings (like goal-less savings buckets): any category with spend

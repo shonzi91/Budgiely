@@ -50,21 +50,30 @@ else
                     </select>
                 </div>
                 <span class="acct-ops">
-                    @if (State.IsOwnerOfCurrent)
-                    {
-                        <button class="link" title="@Loc["Rename account"]" @onclick="OpenEditAccount">✏️</button>
-                    }
                     <button class="link" title="@Loc["Add a new account"]" @onclick="OpenAddAccount">➕</button>
-                    <button class="link" title="@Loc["Invite a contributor"]" @onclick="OpenInvite">👥</button>
-                    <button class="link" title="@Loc["Export to Excel"]" @onclick="ExportAccount">📊</button>
-                    @if (State.IsOwnerOfCurrent)
-                    {
-                        <button class="link" title="@Loc["Delete account"]" @onclick="OpenDeleteAccount">🗑️</button>
-                    }
-                    else
-                    {
-                        <span class="chip" title="@Loc["You were invited to this account"]">shared</span>
-                    }
+                    <span class="acct-menu">
+                        <button class="link" title="@Loc["Account actions"]" @onclick="() => _acctMenuOpen = !_acctMenuOpen">⚙️</button>
+                        @if (_acctMenuOpen)
+                        {
+                            <div class="acct-menu-backdrop" @onclick="() => _acctMenuOpen = false"></div>
+                            <div class="acct-menu-pop">
+                                @if (State.IsOwnerOfCurrent)
+                                {
+                                    <button @onclick="() => RunAcct(OpenEditAccount)">✏️ @Loc["Rename account"]</button>
+                                }
+                                <button @onclick="() => RunAcct(OpenInvite)">👥 @Loc["Invite a contributor"]</button>
+                                <button @onclick="MenuExport">📊 @Loc["Export to Excel"]</button>
+                                @if (State.IsOwnerOfCurrent)
+                                {
+                                    <button class="danger" @onclick="() => RunAcct(OpenDeleteAccount)">🗑️ @Loc["Delete account"]</button>
+                                }
+                                else
+                                {
+                                    <span class="acct-menu-note">@Loc["You were invited to this account"]</span>
+                                }
+                            </div>
+                        }
+                    </span>
                 </span>
             </div>
             <div class="period-nav">
@@ -434,7 +443,7 @@ else
                                     <button class="exp-edit" title="@Loc["Edit"]" @onclick="() => OpenEditDeposit(c.Id)">✏️</button>
                                     <button class="exp-edit" title="@Loc["Remove"]" @onclick="() => OpenDeleteDeposit(c.Id)">🗑️</button>
                                 }
-                                <span><Avatar Name="@State.MemberName(c.MemberId)" Size="20" /> @State.MemberName(c.MemberId) · @c.Date.ToString("dd MMM") · <span class="cat-ico">@State.ContributionCategoryIcon(c.CategoryId)</span> @State.ContributionCategoryName(c.CategoryId) · <span class="cat-ico">@State.FundIcon(c.FundId)</span> @State.FundName(c.FundId)</span>
+                                <span><Avatar Name="@State.MemberName(c.MemberId)" Size="20" /> @State.MemberName(c.MemberId) · @c.Date.ToString("dd MMM") · <span class="cat-ico">@State.ContributionCategoryIcon(c.CategoryId)</span> @State.ContributionCategoryName(c.CategoryId) · @Loc["to"] <span class="cat-ico">@State.FundIcon(c.FundId)</span> @State.FundName(c.FundId)</span>
                             </span>
                             <span class="amt">@Fmt(c.Paid)</span>
                         </li>
@@ -453,13 +462,6 @@ else
                 <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
             </section>
             <section class="panel">
-                <div class="panel-head">
-                    <h2>@Loc["Budgets"]</h2>
-                    <span>
-                        <button class="link" title="@Loc["Add a top-level category"]" @onclick="() => OpenAdd(null)">➕</button>
-                    </span>
-                </div>
-
                 @{
                     var budgeted = State.CategoryOptions.Where(c => State.HasBudget(c.Category.Id)).ToList();
                     var unbudgeted = State.CategoryOptions
@@ -501,10 +503,10 @@ else
                             }
                         </div>
                     }
-                    @if (!budgeted.Any() && !unbudgeted.Any())
-                    {
-                        <p class="ring-empty"><em>@Loc["No budgets yet — add a category with a budget (the ➕ above)."]</em></p>
-                    }
+                    <div class="ring-card ring-card-lg">
+                        <button class="ring-plus" title="@Loc["Add category"]" @onclick="() => OpenAdd(null)">+</button>
+                        <div class="ring-label"><span class="ring-muted">@Loc["Add category"]</span></div>
+                    </div>
                 </div>
             </section>
         </div>
@@ -642,10 +644,6 @@ else
                 </div>
             </section>
             <section class="panel">
-                <div class="panel-head">
-                    <h2>@Loc["Savings buckets"]</h2>
-                    <button class="link" title="@Loc["Add a savings bucket"]" @onclick="OpenAddBucket">➕</button>
-                </div>
                 <div class="ring-grid">
                     @foreach (var (bucket, total) in State.SavingBuckets)
                     {
@@ -676,10 +674,10 @@ else
                             </div>
                         </div>
                     }
-                    @if (!State.SavingBuckets.Any())
-                    {
-                        <p class="ring-empty"><em>@Loc["Your nest is empty — start a savings bucket and watch it grow."]</em></p>
-                    }
+                    <div class="ring-card ring-card-lg">
+                        <button class="ring-plus" title="@Loc["Add a savings bucket"]" @onclick="OpenAddBucket">+</button>
+                        <div class="ring-label"><span class="ring-muted">@Loc["Add bucket"]</span></div>
+                    </div>
                 </div>
             </section>
 
@@ -1032,7 +1030,7 @@ else
 
                 case Modal.AddExpense:
                     <h3>@Loc["Add expense"]</h3>
-                    <label>@Loc["Category"]
+                    <label><span class="lbl-row">@Loc["Category"] <button type="button" class="lbl-add" title="@Loc["Add category"]" @onclick="ExpenseAddCategory">+</button></span>
                         <select @bind="_categoryId">
                             @foreach (var (cat, depth) in State.CategoryOptions)
                             {
@@ -1247,7 +1245,7 @@ else
 
                 case Modal.Deposit:
                     <h3>@Loc["Add a deposit"]</h3>
-                    <label>@Loc["Category"]
+                    <label><span class="lbl-row">@Loc["Category"] <button type="button" class="lbl-add" title="@Loc["New contribution category"]" @onclick="DepositAddCategory">+</button></span>
                         <select @bind="_depCategoryId">
                             @foreach (var cc in State.ContributionCategories)
                             {
@@ -1255,7 +1253,7 @@ else
                             }
                         </select>
                     </label>
-                    <label>@Loc["Fund"]
+                    <label><span class="lbl-row">@Loc["Fund"] <button type="button" class="lbl-add" title="@Loc["New fund"]" @onclick="DepositAddFund">+</button></span>
                         <select @bind="_depFundId">
                             @foreach (var f in State.RootFunds)
                             {
@@ -1940,11 +1938,14 @@ else
     private Task SaveContribCat() => RunModal(async () =>
     {
         if (string.IsNullOrWhiteSpace(_contribCatName)) return;
+        Guid newId = _contribCatId;
         if (_contribCatId == Guid.Empty)
-            await State.AddContributionCategory(_contribCatName!, _fIcon);
+            newId = await State.AddContributionCategory(_contribCatName!, _fIcon);
         else
             await State.SaveContributionCategory(_contribCatId, _contribCatName!, _fIcon);
-        CloseModal();
+        var after = _afterCreate; _afterCreate = null;
+        Back();
+        after?.Invoke(newId);
     });
 
     private void OpenDeleteContribCat(Guid id) { _contribCatId = id; _modal = Modal.DeleteContribCat; }
@@ -2245,11 +2246,12 @@ else
     private Task SaveFund() => RunModal(async () =>
     {
         if (string.IsNullOrWhiteSpace(_fName)) return;
+        var newId = _modalFundId;
         if (_modal == Modal.AddFund)
         {
-            var id = await State.AddFund(_fName!, _fundNote, _fIcon);
+            newId = await State.AddFund(_fName!, _fundNote, _fIcon);
             if (_openingAmount > 0)
-                await State.SetFundOpeningBalance(id, _openingAmount);
+                await State.SetFundOpeningBalance(newId, _openingAmount);
         }
         else
         {
@@ -2258,7 +2260,9 @@ else
             await State.SetFundIcon(_modalFundId, _fIcon);
             await State.SetFundOpeningBalance(_modalFundId, _openingAmount);
         }
-        CloseModal();
+        var after = _afterCreate; _afterCreate = null;
+        Back();
+        after?.Invoke(newId);
     });
 
     private void OpenDeleteFund(Guid fundId)
@@ -2450,7 +2454,23 @@ else
         await JS.InvokeVoidAsync("finappDownloadFile", fileName, Convert.ToBase64String(bytes),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     });
-    private void CloseModal() { _modal = Modal.None; _modalError = null; _modalBack.Clear(); }
+    private void CloseModal() { _modal = Modal.None; _modalError = null; _modalBack.Clear(); _afterCreate = null; }
+
+    // Account-actions cog menu.
+    private bool _acctMenuOpen;
+    private void RunAcct(Action a) { _acctMenuOpen = false; a(); }
+    private Task MenuExport() { _acctMenuOpen = false; return ExportAccount(); }
+
+    // When a create modal is opened from a parent (e.g. "+ new fund" inside the deposit modal), this selects
+    // the freshly-created item back in the parent. Set by the inline-create wrappers, consumed by the Save* handlers.
+    private Action<Guid>? _afterCreate;
+
+    // Deposit modal → inline-create a contribution category / fund (then return to the deposit, with it selected).
+    private void DepositAddCategory() { _afterCreate = id => _depCategoryId = id; _modalBack.Push(() => _modal = Modal.Deposit); OpenAddContribCat(); }
+    private void DepositAddFund() { _afterCreate = id => _depFundId = id; _modalBack.Push(() => _modal = Modal.Deposit); OpenAddFund(); }
+
+    // Add-expense modal → inline-create a budget category (then return to the expense, with it selected).
+    private void ExpenseAddCategory() { _afterCreate = id => _categoryId = id; _modalBack.Push(() => _modal = Modal.AddExpense); OpenAdd(null); }
 
     // Modal navigation stack: opening a modal from inside another pushes a "reopen the parent" action,
     // so Cancel/Close steps back to the parent modal instead of closing everything.
@@ -2507,7 +2527,9 @@ else
         var newId = await State.AddCategory(_fName!, _addParentId, _fIcon);
         if (_fBudget > 0)
             await State.SaveBudget(newId, _fBudget, 80, false);
-        CloseModal();
+        var after = _afterCreate; _afterCreate = null;
+        Back();
+        after?.Invoke(newId);
     });
 
     private Task SaveEditCat() => RunModal(async () =>
