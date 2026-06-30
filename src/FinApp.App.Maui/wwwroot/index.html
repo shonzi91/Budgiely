@@ -23,6 +23,35 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <script>
+        window.finappPickImage = () => new Promise(resolve => {
+            const input = document.createElement('input');
+            input.type = 'file'; input.accept = 'image/*';
+            input.onchange = () => {
+                const file = input.files && input.files[0];
+                if (!file) { resolve(null); return; }
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const size = 128;
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size; canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        const scale = Math.max(size / img.width, size / img.height);
+                        const w = img.width * scale, h = img.height * scale;
+                        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+                        resolve(canvas.toDataURL('image/jpeg', 0.85));
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = reader.result;
+                };
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(file);
+            };
+            input.click();
+        });
+    </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 
 </body>

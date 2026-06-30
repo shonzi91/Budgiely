@@ -12,7 +12,19 @@ public sealed class Localizer(IJSRuntime js)
 {
     private const string StorageKey = "finapp-lang";
 
+    /// <summary>Supported UI languages (code + display name). Add a row here + a Bg-style map to add a language.</summary>
+    public static readonly IReadOnlyList<(string Code, string Name)> Languages =
+    [
+        ("en", "English"),
+        ("bg", "Български"),
+    ];
+
+    private static bool IsSupported(string? code) => code is not null && Languages.Any(l => l.Code == code);
+
     public string Culture { get; private set; } = "en";
+
+    /// <summary>The display name of the currently-selected language.</summary>
+    public string CultureName => Languages.FirstOrDefault(l => l.Code == Culture).Name ?? Culture;
     public event Action? Changed;
 
     /// <summary>Load the saved language once at startup (call from the layout's OnInitializedAsync).</summary>
@@ -21,7 +33,7 @@ public sealed class Localizer(IJSRuntime js)
         try
         {
             var saved = await js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-            if (saved is "en" or "bg" && saved != Culture)
+            if (IsSupported(saved) && saved != Culture)
             {
                 Culture = saved;
                 Changed?.Invoke();
@@ -32,7 +44,7 @@ public sealed class Localizer(IJSRuntime js)
 
     public async Task SetCultureAsync(string culture)
     {
-        if (culture is not ("en" or "bg") || culture == Culture) return;
+        if (!IsSupported(culture) || culture == Culture) return;
         Culture = culture;
         try { await js.InvokeVoidAsync("localStorage.setItem", StorageKey, culture); }
         catch { /* ignore */ }
@@ -139,6 +151,11 @@ public sealed class Localizer(IJSRuntime js)
             "След като въведете приходи или разходи, тук ще се появи отчетът за финансовото ви здраве.",
         ["Icon"] = "Икона",
         ["Auto (from name)"] = "Автоматично (по име)",
+        ["Language"] = "Език",
+        ["Profile picture"] = "Профилна снимка",
+        ["Upload"] = "Качи",
+        ["Stored on this device only."] = "Запазва се само на това устройство.",
+        ["Sub-categories"] = "Подкатегории",
         ["Savings target (%)"] = "Цел за спестяване (%)",
         ["Edit account"] = "Редактирай профила",
         ["Your monthly savings goal — drives the Insights score."] =

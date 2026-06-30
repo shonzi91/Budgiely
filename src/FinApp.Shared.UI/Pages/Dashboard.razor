@@ -137,6 +137,20 @@ else
             </div>
             <div class="insight-delta @(s.Dir switch { DeltaDir.Up => "delta-up", DeltaDir.Down => "delta-down", _ => "delta-flat" })">@s.Delta</div>
         </div>;
+
+        // Shared emoji picker for every add/edit modal (categories, funds, buckets, contributions).
+        // Reads/writes the shared _fName/_fIcon fields; the first "auto" chip clears to a name-based guess.
+        RenderFragment iconPicker =
+        @<div>
+            <label class="icon-label">@Loc["Icon"]</label>
+            <div class="icon-grid">
+                <button type="button" class="icon-opt @(_fIcon is null ? "sel" : "")" title="@Loc["Auto (from name)"]" @onclick="() => _fIcon = null">@(string.IsNullOrEmpty(_fName) ? "🏷️" : CategoryIcons.Guess(_fName))</button>
+                @foreach (var ic in CategoryIcons.Palette)
+                {
+                    <button type="button" class="icon-opt @(_fIcon == ic ? "sel" : "")" @onclick="() => _fIcon = ic">@ic</button>
+                }
+            </div>
+        </div>;
     }
 
     <div class="tab-content">
@@ -293,7 +307,7 @@ else
                             <span class="row-lead">
                                 <button class="exp-edit" title="@Loc["Edit"]" @onclick="() => OpenEditFund(f.Id)">✏️</button>
                                 <button class="exp-edit" title="@Loc["Remove"]" @onclick="() => OpenDeleteFund(f.Id)">🗑️</button>
-                                <span class="fund-name">@f.Name <span class="fund-ico">🏦</span></span>
+                                <span class="fund-name"><span class="cat-ico">@State.FundIcon(f.Id)</span> @f.Name</span>
                                 @if (State.FundNote(f.Id) is { Length: > 0 } note)
                                 {
                                     <span class="row-note">· @note</span>
@@ -420,7 +434,7 @@ else
                                     <button class="exp-edit" title="@Loc["Edit"]" @onclick="() => OpenEditDeposit(c.Id)">✏️</button>
                                     <button class="exp-edit" title="@Loc["Remove"]" @onclick="() => OpenDeleteDeposit(c.Id)">🗑️</button>
                                 }
-                                <span>@c.Date.ToString("dd MMM") · @State.MemberName(c.MemberId) · @State.ContributionCategoryName(c.CategoryId) · @State.FundName(c.FundId) 🏦</span>
+                                <span>@c.Date.ToString("dd MMM") · @State.MemberName(c.MemberId) · <span class="cat-ico">@State.ContributionCategoryIcon(c.CategoryId)</span> @State.ContributionCategoryName(c.CategoryId) · <span class="cat-ico">@State.FundIcon(c.FundId)</span> @State.FundName(c.FundId)</span>
                             </span>
                             <span class="amt">@Fmt(c.Paid)</span>
                         </li>
@@ -621,8 +635,9 @@ else
                         var g = bucket.HasGoal ? State.SavingGoal(bucketId) : (SavingGoalProgress?)null;
                         var pct = (double)(g?.Percent ?? 0);
                         var cls = g is null ? "mint" : g.ThresholdReached && !g.GoalReached ? "warn" : "ok";
-                        <div class="ring-card">
+                        <div class="ring-card ring-card-lg">
                             <ProgressRing Percent="@(g is null ? 0 : pct)" Class="@cls" Dashed="@(g is null)">
+                                <button class="ring-ico-big" title="@Loc["Edit"]" @onclick="() => OpenEditBucket(bucketId)">@State.SavingBucketIcon(bucketId)</button>
                                 <button class="ring-name" title="@Loc["Edit"]" @onclick="() => OpenEditBucket(bucketId)">@bucket.Name</button>
                                 @if (g is not null && g.GoalReached)
                                 {
@@ -845,14 +860,7 @@ else
                 case Modal.AddCat:
                     <h3>@Loc["Add category"] @(_addParentId is {} p ? $"under {State.CategoryName(p)}" : "(top level)")</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
-                    <label class="icon-label">@Loc["Icon"]</label>
-                    <div class="icon-grid">
-                        <button type="button" class="icon-opt @(_fIcon is null ? "sel" : "")" title="@Loc["Auto (from name)"]" @onclick="() => _fIcon = null">@(string.IsNullOrEmpty(_fName) ? "🏷️" : CategoryIcons.Guess(_fName))</button>
-                        @foreach (var ic in CategoryIcons.Palette)
-                        {
-                            <button type="button" class="icon-opt @(_fIcon == ic ? "sel" : "")" @onclick="() => _fIcon = ic">@ic</button>
-                        }
-                    </div>
+                    @iconPicker
                     <label>Budget for this period (optional) <input type="number" step="0.01" min="0" @bind="_fBudget" /></label>
                     <small class="hint">@Loc["Available to budget:"] <strong>@Fmt(State.MaxBudgetFor(Guid.Empty))</strong></small>
                     <div class="modal-actions">
@@ -864,23 +872,35 @@ else
                 case Modal.EditCat:
                     <h3>@State.CategoryIcon(_modalCatId) @Loc["Edit"] @State.CategoryName(_modalCatId)</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
-                    <label class="icon-label">@Loc["Icon"]</label>
-                    <div class="icon-grid">
-                        <button type="button" class="icon-opt @(_fIcon is null ? "sel" : "")" title="@Loc["Auto (from name)"]" @onclick="() => _fIcon = null">@(string.IsNullOrEmpty(_fName) ? "🏷️" : CategoryIcons.Guess(_fName))</button>
-                        @foreach (var ic in CategoryIcons.Palette)
-                        {
-                            <button type="button" class="icon-opt @(_fIcon == ic ? "sel" : "")" @onclick="() => _fIcon = ic">@ic</button>
-                        }
-                    </div>
+                    @iconPicker
                     <label>Budget amount <input type="number" step="0.01" min="0" @bind="_fBudget" /></label>
                     <small class="hint">@Loc["Available to budget:"] <strong>@Fmt(State.MaxBudgetFor(_modalCatId))</strong></small>
                     <label>Alert at % <input type="number" step="1" min="0" max="100" @bind="_fThreshold" /></label>
                     <label class="check"><input type="checkbox" @bind="_fNotify" /> Notify on every expense</label>
+                    var subs = State.ChildrenOf(_modalCatId).ToList();
+                    @if (subs.Count > 0)
+                    {
+                        <h4 class="detail-sub">@Loc["Sub-categories"]</h4>
+                        <ul class="list">
+                            @foreach (var sub in subs)
+                            {
+                                var subId = sub.Id;
+                                <li>
+                                    <span class="row-lead">
+                                        <button class="exp-edit" title="@Loc["Edit"]" @onclick="() => OpenEdit(subId)">✏️</button>
+                                        <button class="exp-edit" title="@Loc["Remove"]" @onclick="() => OpenDelete(subId)">🗑️</button>
+                                        <span><span class="cat-ico">@State.CategoryIcon(subId)</span> @sub.Name</span>
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    }
                     <div class="modal-actions">
                         @if (State.BudgetFor(_modalCatId) is not null)
                         {
                             <button class="ghost danger" @onclick="RemoveBudget">Remove budget</button>
                         }
+                        <button class="ghost" @onclick="() => OpenAddSub(_modalCatId)">➕ @Loc["Sub-category"]</button>
                         <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
                         <button @onclick="SaveEditCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Save"]</button>
                     </div>
@@ -1146,6 +1166,7 @@ else
                 case Modal.EditBucket:
                     <h3>@(_modal == Modal.AddBucket ? "New savings bucket" : $"Edit {State.FindSavingBucket(_modalBucketId)?.Name}")</h3>
                     <label>Name <input type="text" @bind="_fName" /></label>
+                    @iconPicker
                     <label>Goal amount (optional) <input type="number" step="0.01" min="0" @bind="_goalAmount" /></label>
                     <label>Alert at % <input type="number" step="1" min="0" max="100" @bind="_fThreshold" /></label>
                     <label class="check"><input type="checkbox" @bind="_fNotify" /> Notify on milestone</label>
@@ -1242,7 +1263,7 @@ else
                                 <span class="row-lead">
                                     <button class="exp-edit" title="@Loc["Rename"]" @onclick="() => OpenEditContribCat(cc.Id)">✏️</button>
                                     <button class="exp-edit" title="@Loc["Remove"]" @onclick="() => OpenDeleteContribCat(cc.Id)">🗑️</button>
-                                    <span>@cc.Name</span>
+                                    <span><span class="cat-ico">@State.ContributionCategoryIcon(cc.Id)</span> @cc.Name</span>
                                 </span>
                             </li>
                         }
@@ -1350,6 +1371,14 @@ else
                 case Modal.ContribCat:
                     <h3>@(_contribCatId == Guid.Empty ? Loc["New contribution category"] : Loc["Rename category"])</h3>
                     <label>@Loc["Name"] <input type="text" @bind="_contribCatName" /></label>
+                    <label class="icon-label">@Loc["Icon"]</label>
+                    <div class="icon-grid">
+                        <button type="button" class="icon-opt @(_fIcon is null ? "sel" : "")" title="@Loc["Auto (from name)"]" @onclick="() => _fIcon = null">@(string.IsNullOrEmpty(_contribCatName) ? "🏷️" : CategoryIcons.Guess(_contribCatName))</button>
+                        @foreach (var ic in CategoryIcons.Palette)
+                        {
+                            <button type="button" class="icon-opt @(_fIcon == ic ? "sel" : "")" @onclick="() => _fIcon = ic">@ic</button>
+                        }
+                    </div>
                     <div class="modal-actions">
                         <button class="ghost" @onclick="CloseModal">@Loc["Cancel"]</button>
                         <button @onclick="SaveContribCat" disabled="@(string.IsNullOrWhiteSpace(_contribCatName))">@(_contribCatId == Guid.Empty ? Loc["Add"] : Loc["Save"])</button>
@@ -1414,6 +1443,7 @@ else
                 case Modal.AddFund:
                     <h3>@Loc["New fund"]</h3>
                     <label>@Loc["Name"] <input type="text" @bind="_fName" /></label>
+                    @iconPicker
                     <label>@Loc["Note (optional)"] <input type="text" @bind="_fundNote" /></label>
                     <label>@Loc["Opening balance this period (optional)"] <input type="text" inputmode="text" @bind:get="_openingAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)" @bind:set="v => _openingAmount = EvalSum(v)" /></label>
                     <div class="modal-actions">
@@ -1423,8 +1453,9 @@ else
                     break;
 
                 case Modal.EditFund:
-                    <h3>@Loc["Edit"] @State.FundName(_modalFundId)</h3>
+                    <h3>@State.FundIcon(_modalFundId) @Loc["Edit"] @State.FundName(_modalFundId)</h3>
                     <label>@Loc["Name"] <input type="text" @bind="_fName" /></label>
+                    @iconPicker
                     <label>@Loc["Note (optional)"] <input type="text" @bind="_fundNote" /></label>
                     <label>@Loc["Opening balance this period"] <input type="text" inputmode="text" @bind:get="_openingAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)" @bind:set="v => _openingAmount = EvalSum(v)" /></label>
                     <div class="modal-actions">
@@ -1886,16 +1917,16 @@ else
         CloseModal();
     });
 
-    private void OpenAddContribCat() { _contribCatId = Guid.Empty; _contribCatName = null; _modal = Modal.ContribCat; }
-    private void OpenEditContribCat(Guid id) { _contribCatId = id; _contribCatName = State.ContributionCategoryName(id); _modal = Modal.ContribCat; }
+    private void OpenAddContribCat() { _contribCatId = Guid.Empty; _contribCatName = null; _fIcon = null; _modal = Modal.ContribCat; }
+    private void OpenEditContribCat(Guid id) { _contribCatId = id; _contribCatName = State.ContributionCategoryName(id); _fIcon = State.ContributionCategoryStoredIcon(id); _modal = Modal.ContribCat; }
 
     private Task SaveContribCat() => RunModal(async () =>
     {
         if (string.IsNullOrWhiteSpace(_contribCatName)) return;
         if (_contribCatId == Guid.Empty)
-            await State.AddContributionCategory(_contribCatName!);
+            await State.AddContributionCategory(_contribCatName!, _fIcon);
         else
-            await State.RenameContributionCategory(_contribCatId, _contribCatName!);
+            await State.SaveContributionCategory(_contribCatId, _contribCatName!, _fIcon);
         CloseModal();
     });
 
@@ -2141,7 +2172,7 @@ else
 
     private void OpenAddBucket()
     {
-        _modalBucketId = Guid.Empty; _fName = null; _goalAmount = 0; _fThreshold = 80; _fNotify = false; _initialSavings = 0;
+        _modalBucketId = Guid.Empty; _fName = null; _fIcon = null; _goalAmount = 0; _fThreshold = 80; _fNotify = false; _initialSavings = 0;
         _modal = Modal.AddBucket;
     }
 
@@ -2150,6 +2181,7 @@ else
         _modalBucketId = bucketId;
         var b = State.FindSavingBucket(bucketId);
         _fName = b?.Name;
+        _fIcon = State.SavingBucketStoredIcon(bucketId);
         _goalAmount = b?.GoalAmount ?? 0;
         _fThreshold = (b?.AlertThreshold ?? 0.80m) * 100m;
         _fNotify = b?.NotifyOnMilestone ?? false;
@@ -2162,9 +2194,9 @@ else
         if (string.IsNullOrWhiteSpace(_fName)) return;
         decimal? goal = _goalAmount > 0 ? _goalAmount : null;
         if (_modal == Modal.AddBucket)
-            await State.AddSavingBucket(_fName!, goal, _fThreshold, _fNotify, _initialSavings);
+            await State.AddSavingBucket(_fName!, goal, _fThreshold, _fNotify, _initialSavings, _fIcon);
         else
-            await State.SaveSavingBucket(_modalBucketId, _fName!, goal, _fThreshold, _fNotify, _initialSavings);
+            await State.SaveSavingBucket(_modalBucketId, _fName!, goal, _fThreshold, _fNotify, _initialSavings, _fIcon);
         CloseModal();
     });
 
@@ -2180,13 +2212,14 @@ else
 
     private void OpenAddFund()
     {
-        _modalFundId = Guid.Empty; _fName = null; _fundNote = null; _openingAmount = 0; _modal = Modal.AddFund;
+        _modalFundId = Guid.Empty; _fName = null; _fIcon = null; _fundNote = null; _openingAmount = 0; _modal = Modal.AddFund;
     }
 
     private void OpenEditFund(Guid fundId)
     {
         _modalFundId = fundId;
         _fName = State.FundName(fundId);
+        _fIcon = State.FundStoredIcon(fundId);
         _fundNote = State.FundNote(fundId);
         _openingAmount = State.FundOpeningBalance(fundId).Amount;
         _modal = Modal.EditFund;
@@ -2197,7 +2230,7 @@ else
         if (string.IsNullOrWhiteSpace(_fName)) return;
         if (_modal == Modal.AddFund)
         {
-            var id = await State.AddFund(_fName!, _fundNote);
+            var id = await State.AddFund(_fName!, _fundNote, _fIcon);
             if (_openingAmount > 0)
                 await State.SetFundOpeningBalance(id, _openingAmount);
         }
@@ -2205,6 +2238,7 @@ else
         {
             await State.RenameFund(_modalFundId, _fName!);
             await State.SetFundNote(_modalFundId, _fundNote);
+            await State.SetFundIcon(_modalFundId, _fIcon);
             await State.SetFundOpeningBalance(_modalFundId, _openingAmount);
         }
         CloseModal();

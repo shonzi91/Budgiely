@@ -56,6 +56,35 @@ mint/cream look. **Everything is derived from existing domain reads — no domai
 - **Possible follow-ups:** add an InsightsService unit test (no test project covers Shared.UI today); localize the generated
   sentences; a "How it's calculated" expander for the score; the savings gauge track is fixed at 0–40% (clamps if target > 40%).
 
+## Session 12d (2026-06-30) — icons everywhere, sub-cat editing, avatar, language dropdown, smarter spike. 112 tests.
+Five requests:
+1. **Edit-category modal now lists sub-categories** with ✏️/🗑️ (→ existing edit/delete flows) + a "➕ Sub-category" action.
+2. **Icons for funds, savings buckets, AND contribution categories** (was categories-only). Same body-data pattern as
+   `Category.Icon`: new `Icon` + `SetIcon` on `Fund`/`SavingCategory`/`ContributionCategory` (NOT ctor params — EF binding),
+   carried in the snapshot serializer (each node's `Icon`, default null), **`Ignore`d in EF**. `Account.SetFundIcon`/
+   `SetSavingCategoryIcon`/`SetContributionCategoryIcon`. `BudgetingState` gained `FundIcon/SavingBucketIcon/ContributionCategoryIcon`
+   (effective) + `…StoredIcon` (raw) + icon params on add/save. Shared **`iconPicker` RenderFragment** (reads `_fName`/`_fIcon`)
+   drops into every add/edit modal (categories, funds, buckets; contrib uses an inline copy keyed off `_contribCatName`). Icons
+   shown in: Funds list (replaced the generic 🏦), Savings rings (big centred, like budgets), contributions list + manage list.
+   `CategoryIcons` got generic `Effective(icon, name)`, +income/cash keywords (salary→💼, cash→💵…), +10 palette icons.
+3. **Profile picture** — client-side only (localStorage `finapp-avatar:{username}`, never sent to the server). New JS
+   `finappPickImage` (file-pick → canvas cover-crop to 128px → JPEG dataURL) in **both** index.html hosts. Shown as a round
+   avatar in the app bar (initial-letter fallback) + Upload/Remove in the profile modal (`MainLayout`). NOTE: device-local, no
+   cross-device sync — making it sync is a server/User change (avatar column or blob endpoint) deferred for the prod-EnsureCreated reason.
+4. **Language switch → dropdown, icon-only** — flag emoji removed (they render as bare "GB"/"BG" letters on Windows!). New
+   **`Components/LanguagePicker.razor`** (🌐 globe button → menu of language *names*; backdrop closes it) used in the app bar and
+   AuthPanel. `Localizer.Languages` is now a `(Code,Name)[]` list (add a row + a Bg-style map to add a language); validation is
+   list-driven. Removed the `.lang`/`.flag` markup + `SetLang`.
+5. **"Eating your budget" spike made honest** — renamed to **"{cat} is running high"** and `TopSpikingCategory` now filters out
+   low-base illusions: requires ≥40% over the trailing avg **AND** the absolute jump ≥10% of the month's spend **AND** the
+   category ≥15% of spend, and **skips anything within its budget** (planned spend isn't flagged). Ranked by money, not %.
+- **Razor gotcha (again):** the EditCat sub-cat `var subs = …;` must be bare inside the `@switch`/`case` body (no `@{ }`).
+- **Files:** domain `Funds/Fund.cs`, `Savings/SavingCategory.cs`, `Periods/ContributionCategory.cs`, `Accounts/Account.cs`;
+  `Contracts/AccountSnapshotSerializer.cs`; `Persistence/FinAppDbContext.cs`; `Shared.UI/Services/{CategoryIcons,BudgetingState,
+  InsightsService,Localizer}.cs`; new `Shared.UI/Components/LanguagePicker.razor`(+`.css`); `Shared.UI/Layout/MainLayout.razor`(+`.css`);
+  `Shared.UI/Components/AuthPanel.razor`; `Shared.UI/Pages/Dashboard.razor`; both `wwwroot/index.html`. Serializer test asserts the 3
+  new icons round-trip. 112 tests.
+
 ## Session 12c (2026-06-30) — Overview tab + Insights/Budgets polish. UI-only. 112 tests.
 Six requests, all UI-layer (no domain/serializer/EF changes):
 1. **Budgets rings redesigned:** bigger cards (`.ring-card-lg` 150px → fewer per row) with the category **icon big & centered

@@ -480,9 +480,10 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
             throw new InvalidOperationException("You can only change your own contributions.");
     }
 
-    public Task AddContributionCategory(string name)
+    public Task AddContributionCategory(string name, string? icon = null)
     {
-        Account.AddContributionCategory(name);
+        var c = Account.AddContributionCategory(name);
+        Account.SetContributionCategoryIcon(c.Id, icon);
         return SaveAsync();
     }
 
@@ -491,6 +492,18 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         Account.RenameContributionCategory(id, name);
         return SaveAsync();
     }
+
+    /// <summary>Rename a contribution category and set its icon in one save.</summary>
+    public Task SaveContributionCategory(Guid id, string name, string? icon)
+    {
+        Account.RenameContributionCategory(id, name);
+        Account.SetContributionCategoryIcon(id, icon);
+        return SaveAsync();
+    }
+
+    public string ContributionCategoryIcon(Guid id) =>
+        CategoryIcons.Effective(Account.FindContributionCategory(id)?.Icon, Account.FindContributionCategory(id)?.Name);
+    public string? ContributionCategoryStoredIcon(Guid id) => Account.FindContributionCategory(id)?.Icon;
 
     public Task RemoveContributionCategory(Guid id)
     {
@@ -540,9 +553,10 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     public bool CanSetInitialSavings => PeriodCount == 1;
 
     // Saving bucket CRUD
-    public async Task<Guid> AddSavingBucket(string name, decimal? goalAmount, decimal thresholdPercent, bool notifyOnMilestone, decimal initialAmount)
+    public async Task<Guid> AddSavingBucket(string name, decimal? goalAmount, decimal thresholdPercent, bool notifyOnMilestone, decimal initialAmount, string? icon = null)
     {
         var bucket = Account.AddSavingCategory(name);
+        Account.SetSavingCategoryIcon(bucket.Id, icon);
         if (goalAmount is > 0m)
             Account.ConfigureSavingGoal(bucket.Id, goalAmount, thresholdPercent / 100m, notifyOnMilestone);
         if (CanSetInitialSavings && initialAmount > 0m)
@@ -551,14 +565,19 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         return bucket.Id;
     }
 
-    public Task SaveSavingBucket(Guid savingCategoryId, string name, decimal? goalAmount, decimal thresholdPercent, bool notifyOnMilestone, decimal initialAmount)
+    public Task SaveSavingBucket(Guid savingCategoryId, string name, decimal? goalAmount, decimal thresholdPercent, bool notifyOnMilestone, decimal initialAmount, string? icon = null)
     {
         Account.RenameSavingCategory(savingCategoryId, name);
+        Account.SetSavingCategoryIcon(savingCategoryId, icon);
         Account.ConfigureSavingGoal(savingCategoryId, goalAmount is > 0m ? goalAmount : null, thresholdPercent / 100m, notifyOnMilestone);
         if (CanSetInitialSavings)
             Account.SetSavingInitialAmount(savingCategoryId, initialAmount);
         return SaveAsync();
     }
+
+    public string SavingBucketIcon(Guid id) =>
+        CategoryIcons.Effective(FindSavingBucket(id)?.Icon, FindSavingBucket(id)?.Name);
+    public string? SavingBucketStoredIcon(Guid id) => FindSavingBucket(id)?.Icon;
 
     public decimal SavingInitialAmount(Guid savingCategoryId) => FindSavingBucket(savingCategoryId)?.InitialAmount ?? 0m;
 
@@ -569,11 +588,12 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     }
 
     // Fund CRUD + transfers
-    public async Task<Guid> AddFund(string name, string? note = null)
+    public async Task<Guid> AddFund(string name, string? note = null, string? icon = null)
     {
         var fund = Account.AddFund(name);
         if (!string.IsNullOrWhiteSpace(note))
             Account.SetFundNote(fund.Id, note);
+        Account.SetFundIcon(fund.Id, icon);
         await SaveAsync();
         return fund.Id;
     }
@@ -583,6 +603,16 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         Account.RenameFund(fundId, name);
         return SaveAsync();
     }
+
+    public Task SetFundIcon(Guid fundId, string? icon)
+    {
+        Account.SetFundIcon(fundId, icon);
+        return SaveAsync();
+    }
+
+    public string FundIcon(Guid fundId) =>
+        CategoryIcons.Effective(Account.FindFund(fundId)?.Icon, Account.FindFund(fundId)?.Name);
+    public string? FundStoredIcon(Guid fundId) => Account.FindFund(fundId)?.Icon;
 
     public Task SetFundNote(Guid fundId, string? note)
     {

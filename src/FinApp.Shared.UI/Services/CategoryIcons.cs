@@ -12,13 +12,14 @@ public static class CategoryIcons
     /// <summary>Shown when a category has no icon and the name doesn't match anything.</summary>
     public const string Fallback = "🏷️";
 
-    /// <summary>The ~32 predefined icons offered in the add/edit-category picker.</summary>
+    /// <summary>The predefined icons offered in the add/edit picker (categories, funds, buckets, contributions).</summary>
     public static readonly IReadOnlyList<string> Palette =
     [
         "🍽️", "🛒", "🍔", "☕", "🍺", "🏠", "💡", "💧", "🔥", "🚗",
         "⛽", "🚌", "✈️", "🛍️", "👕", "💊", "🏥", "💪", "🎬", "🎮",
         "🎵", "📱", "💻", "🌐", "🎓", "📚", "🎁", "🐶", "👶", "💇",
-        "🧾", "💰", "🏦", "🔧", "🌱", "🎨",
+        "🧾", "💰", "🏦", "🔧", "🌱", "🎨", "💵", "👛", "💼", "🪙",
+        "💳", "📈", "🎉", "🏖️", "🩺", "🚿",
     ];
 
     // Ordered keyword → icon rules; first match wins. Lowercased "contains" matching.
@@ -29,6 +30,10 @@ public static class CategoryIcons
         (["fast", "burger", "takeaway", "takeout", "snack"], "🍔"),
         (["coffee", "cafe", "café"], "☕"),
         (["beer", "alcohol", "drink", "bar", "pub", "wine"], "🍺"),
+        (["salary", "wage", "payroll", "paycheck", "income"], "💼"),
+        (["bonus", "commission"], "🎉"),
+        (["pension", "dividend", "interest", "investment", "freelance", "side"], "📈"),
+        (["cash", "wallet"], "💵"),
         (["rent", "mortgage", "housing", "house", "home", "accommodation"], "🏠"),
         (["electric", "utilit", "bill", "power"], "💡"),
         (["water"], "💧"),
@@ -64,9 +69,11 @@ public static class CategoryIcons
 
     /// <summary>The icon to display for a category: its explicit icon, else a guess from the name, else the fallback.</summary>
     public static string Effective(Category? category) =>
-        category is null ? Fallback
-        : !string.IsNullOrWhiteSpace(category.Icon) ? category.Icon!
-        : Guess(category.Name);
+        category is null ? Fallback : Effective(category.Icon, category.Name);
+
+    /// <summary>The icon to display given an explicit (maybe-null) icon and a name — works for any named entity.</summary>
+    public static string Effective(string? icon, string? name) =>
+        !string.IsNullOrWhiteSpace(icon) ? icon! : Guess(name);
 
     /// <summary>Best-effort icon for a category name (used when no icon is stored).</summary>
     public static string Guess(string? name)

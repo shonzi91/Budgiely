@@ -12,6 +12,9 @@ public sealed class SavingCategory : Entity
     public string Name { get; private set; }
     public Guid? ParentId { get; private set; }
 
+    /// <summary>Optional display icon (emoji). Null → the UI derives one from the name. Body data (in the snapshot, not EF).</summary>
+    public string? Icon { get; private set; }
+
     /// <summary>Optional target amount (in the account currency) for this bucket; null when there's no goal.</summary>
     public decimal? GoalAmount { get; private set; }
 
@@ -59,6 +62,8 @@ public sealed class SavingCategory : Entity
         AlertThreshold = alertThreshold;
         NotifyOnMilestone = notifyOnMilestone;
     }
+
+    public void SetIcon(string? icon) => Icon = string.IsNullOrWhiteSpace(icon) ? null : icon.Trim();
 
     /// <summary>Set the pre-existing balance carried into the bucket at setup time. Cannot be negative.</summary>
     public void SetInitialAmount(decimal amount)

@@ -23,6 +23,10 @@ public class SnapshotSerializerTests
         account.AddDefaultFunds();
         var bank = account.FundId("Bank");
         var cash = account.FundId("Cash");
+        account.SetFundIcon(bank, "🏦");
+
+        var salary = account.AddContributionCategory("Salary");
+        account.SetContributionCategoryIcon(salary.Id, "💼");
 
         var food = account.AddCategory("Food", icon: "🍽️");
         account.AddCategory("Groceries", food.Id); // nested, no explicit icon
@@ -30,6 +34,7 @@ public class SnapshotSerializerTests
 
         var vacations = account.AddSavingCategory("Vacations");
         account.ConfigureSavingGoal(vacations.Id, 2000m, 0.75m, notifyOnMilestone: true);
+        account.SetSavingCategoryIcon(vacations.Id, "🏖️");
 
         var period = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
         period.SetInitialBalance(bank, Eur(1000));
@@ -65,6 +70,10 @@ public class SnapshotSerializerTests
 
         // Funds & categories (ids preserved so references resolve)
         Assert.Equal(original.Funds.Select(f => (f.Id, f.Name)), copy.Funds.Select(f => (f.Id, f.Name)));
+        // Icons round-trip on funds, buckets and contribution categories
+        Assert.Equal("🏦", copy.Funds.Single(f => f.Name == "Bank").Icon);
+        Assert.Equal("🏖️", copy.SavingCategories.Single(s => s.Name == "Vacations").Icon);
+        Assert.Equal("💼", copy.ContributionCategories.Single(c => c.Name == "Salary").Icon);
         Assert.Equal(original.Categories.Select(c => (c.Id, c.Name, c.ParentId, c.Icon)),
                      copy.Categories.Select(c => (c.Id, c.Name, c.ParentId, c.Icon)));
         Assert.Equal("🍽️", copy.Categories.Single(c => c.Name == "Food").Icon);

@@ -60,6 +60,7 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             c.ToTable("ContributionCategories");
             Key(c);
             c.Property(x => x.Name).IsRequired();
+            c.Ignore(x => x.Icon);  // body data — in the snapshot, not a relational column
         });
 
         b.Entity<Fund>(f =>
@@ -70,6 +71,7 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             f.Property(x => x.ParentId);
             f.Property(x => x.Note);
             f.Ignore(x => x.IsRoot);
+            f.Ignore(x => x.Icon);  // body data — in the snapshot, not a relational column
         });
 
         b.Entity<User>(u =>
@@ -138,6 +140,7 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             c.Property(x => x.InitialAmount);
             c.Ignore(x => x.IsRoot);
             c.Ignore(x => x.HasGoal);
+            c.Ignore(x => x.Icon);  // body data — in the snapshot, not a relational column
         });
 
         b.Entity<Period>(p =>

@@ -11,6 +11,9 @@ public sealed class ContributionCategory : Entity
 {
     public string Name { get; private set; }
 
+    /// <summary>Optional display icon (emoji). Null → the UI derives one from the name. Body data (in the snapshot, not EF).</summary>
+    public string? Icon { get; private set; }
+
     public ContributionCategory(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -24,4 +27,6 @@ public sealed class ContributionCategory : Entity
             throw new ArgumentException("Contribution category name is required.", nameof(name));
         Name = name.Trim();
     }
+
+    public void SetIcon(string? icon) => Icon = string.IsNullOrWhiteSpace(icon) ? null : icon.Trim();
 }

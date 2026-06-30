@@ -192,6 +192,10 @@ public sealed class Account : Entity
         bucket.Rename(name);
     }
 
+    /// <summary>Set (or clear) a savings bucket's display icon.</summary>
+    public void SetSavingCategoryIcon(Guid savingCategoryId, string? icon) =>
+        (FindSavingCategory(savingCategoryId) ?? throw new InvalidOperationException("Saving category not found.")).SetIcon(icon);
+
     /// <summary>Set or clear a savings bucket's goal and alert settings.</summary>
     public void ConfigureSavingGoal(Guid savingCategoryId, decimal? goalAmount, decimal alertThreshold = 0.80m, bool notifyOnMilestone = false) =>
         (FindSavingCategory(savingCategoryId) ?? throw new InvalidOperationException("Saving category not found."))
@@ -234,6 +238,10 @@ public sealed class Account : Entity
     }
 
     public ContributionCategory? FindContributionCategory(Guid id) => _contributionCategories.FirstOrDefault(c => c.Id == id);
+
+    /// <summary>Set (or clear) a contribution category's display icon.</summary>
+    public void SetContributionCategoryIcon(Guid id, string? icon) =>
+        (FindContributionCategory(id) ?? throw new InvalidOperationException("Contribution category not found.")).SetIcon(icon);
 
     public void RenameContributionCategory(Guid id, string name)
     {
@@ -310,6 +318,10 @@ public sealed class Account : Entity
         var fund = FindFund(fundId) ?? throw new InvalidOperationException("Fund not found.");
         fund.SetNote(note);
     }
+
+    /// <summary>Set (or clear) a fund's display icon.</summary>
+    public void SetFundIcon(Guid fundId, string? icon) =>
+        (FindFund(fundId) ?? throw new InvalidOperationException("Fund not found.")).SetIcon(icon);
 
     /// <summary>
     /// Why a fund can't be removed, or null when it can. Opening balances are <b>not</b> a hard blocker —

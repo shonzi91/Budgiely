@@ -20,6 +20,9 @@ public sealed class Fund : Entity
     /// <summary>Optional free-text note describing the fund.</summary>
     public string? Note { get; private set; }
 
+    /// <summary>Optional display icon (emoji). Null → the UI derives one from the name. Body data (in the snapshot, not EF).</summary>
+    public string? Icon { get; private set; }
+
     public Fund(string name, Guid? parentId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -38,4 +41,6 @@ public sealed class Fund : Entity
     }
 
     public void SetNote(string? note) => Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+
+    public void SetIcon(string? icon) => Icon = string.IsNullOrWhiteSpace(icon) ? null : icon.Trim();
 }

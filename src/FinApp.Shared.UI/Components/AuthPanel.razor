@@ -4,8 +4,7 @@
 
 <div class="auth">
     <div class="auth-lang">
-        <button class="flag @(Loc.Culture == "en" ? "active" : "")" title="English" @onclick='() => Loc.SetCultureAsync("en")'>🇬🇧</button>
-        <button class="flag @(Loc.Culture == "bg" ? "active" : "")" title="Български" @onclick='() => Loc.SetCultureAsync("bg")'>🇧🇬</button>
+        <LanguagePicker />
     </div>
     <h1 class="auth-brand"><span class="auth-logo"><TandemLogo /></span> TandemTab</h1>
     <p class="auth-slogan">@Loc["Track together, save together."]</p>

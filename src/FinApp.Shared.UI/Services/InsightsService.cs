@@ -330,11 +330,11 @@ public sealed class InsightsService
         var good = new List<Signal>();
         var info = new List<Signal>();
 
-        // Category spiking over its trailing average.
+        // Category running materially above its usual pace (budget-aware; ignores within-budget spend and small amounts).
         var spike = TopSpikingCategory(account, periods, idx);
         if (spike is { } s)
-            warn.Add(new Signal(SignalKind.Warn, $"{s.Name} is eating your budget",
-                $"You've spent {fmt(s.Cur)} on {s.Name} — your recent average is {fmt(s.Avg)}.",
+            warn.Add(new Signal(SignalKind.Warn, $"{s.Name} is running high",
+                $"You've spent {fmt(s.Cur)} on {s.Name} — {fmt(s.Delta)} ({s.Pct}%) above your recent average of {fmt(s.Avg)}.",
                 $"+{s.Pct}%", DeltaDir.Up));
 
         // Overspent budgets — expandable to the per-category breakdown.
@@ -400,12 +400,20 @@ public sealed class InsightsService
         return ordered.Take(5).ToList();
     }
 
-    private (string Name, Money Cur, Money Avg, int Pct)? TopSpikingCategory(
+    /// <summary>
+    /// The category most materially above its recent average — but only when the jump is "concerning":
+    /// it must be over its budget (if it has one), be a meaningful share of the month's spend, and the
+    /// <i>absolute</i> jump must matter (not just a big % off a tiny base). Ranked by money, not by %.
+    /// </summary>
+    private (string Name, Money Cur, Money Avg, Money Delta, int Pct)? TopSpikingCategory(
         Account account, IReadOnlyList<Period> periods, int idx)
     {
         if (idx == 0) return null;
         var p = periods[idx];
-        (string Name, Money Cur, Money Avg, int Pct)? best = null;
+        var totalSpend = p.ExpensesTotal.Amount;
+        if (totalSpend <= 0m) return null;
+
+        (string Name, Money Cur, Money Avg, Money Delta, int Pct)? best = null;
         foreach (var root in account.RootCategories)
         {
             var cur = SpentInTree(account, p, root.Id).Amount;
@@ -418,10 +426,19 @@ public sealed class InsightsService
             var avg = sum / n;
             if (avg <= 0m) continue;
 
-            var pct = (int)Math.Round((cur - avg) / avg * 100m, MidpointRounding.AwayFromZero);
-            if (pct < 25) continue; // only flag a real spike
-            if (best is null || pct > best.Value.Pct)
-                best = (root.Name, new Money(cur, account.Currency), new Money(decimal.Round(avg, 2), account.Currency), pct);
+            var delta = cur - avg;
+            var pct = (int)Math.Round(delta / avg * 100m, MidpointRounding.AwayFromZero);
+
+            // Filters that keep this honest:
+            if (pct < 40) continue;                       // a real jump, not noise
+            if (delta < 0.10m * totalSpend) continue;     // the jump is a meaningful slice of the month (not a low-base illusion)
+            if (cur < 0.15m * totalSpend) continue;       // the category itself is a meaningful chunk of spending
+            if (p.FindBudget(root.Id) is { } b && cur <= b.Allocated.Amount) continue; // within its plan — not concerning
+
+            // Rank by the absolute money jump, so we surface the biggest real overspend, not the biggest percentage.
+            if (best is null || delta > best.Value.Delta.Amount)
+                best = (root.Name, new Money(cur, account.Currency), new Money(decimal.Round(avg, 2), account.Currency),
+                    new Money(decimal.Round(delta, 2), account.Currency), pct);
         }
         return best;
     }

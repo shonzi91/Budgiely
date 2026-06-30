@@ -4,6 +4,7 @@
 @inject BudgetingState State
 @inject Localizer Loc
 @inject FinAppApiClient Api
+@inject IJSRuntime JS
 
 <div class="app-shell">
     @if (Auth.IsAuthenticated)
@@ -11,10 +12,17 @@
         <header class="app-bar">
             <span class="brand"><span class="brand-logo"><TandemLogo /></span> TandemTab</span>
             <span class="appbar-user">
-                <span class="lang">
-                    <button class="flag @(Loc.Culture == "en" ? "active" : "")" title="English" @onclick='() => SetLang("en")'>🇬🇧</button>
-                    <button class="flag @(Loc.Culture == "bg" ? "active" : "")" title="Български" @onclick='() => SetLang("bg")'>🇧🇬</button>
-                </span>
+                <LanguagePicker />
+                <button class="avatar" title="@Loc["Profile settings"]" @onclick="OpenProfile">
+                    @if (_avatar is not null)
+                    {
+                        <img src="@_avatar" alt="" />
+                    }
+                    else
+                    {
+                        <span>@Initial</span>
+                    }
+                </button>
                 <button class="user" title="@Loc["Profile settings"]" @onclick="OpenProfile">@Loc["Hello,"] @Auth.CurrentUser!.Username</button>
                 <button class="link" @onclick="SignOut">@Loc["Sign out"]</button>
             </span>
@@ -41,6 +49,25 @@
             <div class="pm" @onclick:stopPropagation="true">
                 <h3>@Loc["Profile settings"]</h3>
                 <p class="pm-who">@Auth.CurrentUser!.Username · @Auth.CurrentUser!.Email</p>
+                <h4>@Loc["Profile picture"]</h4>
+                <div class="pm-avatar-row">
+                    <span class="pm-avatar">
+                        @if (_avatar is not null)
+                        {
+                            <img src="@_avatar" alt="" />
+                        }
+                        else
+                        {
+                            <span>@Initial</span>
+                        }
+                    </span>
+                    <button class="ghost" @onclick="PickAvatar">@Loc["Upload"]</button>
+                    @if (_avatar is not null)
+                    {
+                        <button class="ghost danger" @onclick="RemoveAvatar">@Loc["Remove"]</button>
+                    }
+                </div>
+                <p class="pm-hint">@Loc["Stored on this device only."]</p>
                 <h4>@Loc["Change password"]</h4>
                 @if (_pwdError is not null)
                 {
@@ -64,6 +91,8 @@
 
 @code {
     private bool _restored;
+    private string? _avatar;
+    private string Initial => (Auth.CurrentUser?.Username ?? "?").Trim() is { Length: > 0 } u ? u[..1].ToUpperInvariant() : "?";
 
     private bool _profileOpen, _pwdBusy, _pwdOk;
     private string _curPwd = "", _newPwd = "", _confirmPwd = "";
@@ -96,11 +125,56 @@
         try { await Auth.TryRestoreAsync(); }
         catch { /* server unreachable on startup — fall through to the sign-in screen */ }
         _restored = true;
+        await EnsureAvatarAsync();
     }
 
-    private void OnChanged() => InvokeAsync(StateHasChanged);
+    private string? _avatarFor;
 
-    private async Task SetLang(string culture) => await Loc.SetCultureAsync(culture);
+    /// <summary>(Re)load the avatar when the signed-in user changes.</summary>
+    private async Task EnsureAvatarAsync()
+    {
+        var user = Auth.CurrentUser?.Username;
+        if (user == _avatarFor) return;
+        _avatarFor = user;
+        await LoadAvatarAsync();
+        StateHasChanged();
+    }
+
+    private void OnChanged()
+    {
+        InvokeAsync(StateHasChanged);
+        InvokeAsync(EnsureAvatarAsync);
+    }
+
+    // --- Profile picture (stored client-side in localStorage, per user; never leaves the device) ---
+
+    private string AvatarKey => $"finapp-avatar:{Auth.CurrentUser?.Username}";
+
+    private async Task LoadAvatarAsync()
+    {
+        if (!Auth.IsAuthenticated) { _avatar = null; return; }
+        try { _avatar = await JS.InvokeAsync<string?>("localStorage.getItem", AvatarKey); }
+        catch { _avatar = null; }
+    }
+
+    private async Task PickAvatar()
+    {
+        try
+        {
+            var dataUrl = await JS.InvokeAsync<string?>("finappPickImage");
+            if (string.IsNullOrEmpty(dataUrl)) return;
+            _avatar = dataUrl;
+            await JS.InvokeVoidAsync("localStorage.setItem", AvatarKey, dataUrl);
+        }
+        catch { /* user cancelled or storage unavailable */ }
+    }
+
+    private async Task RemoveAvatar()
+    {
+        _avatar = null;
+        try { await JS.InvokeVoidAsync("localStorage.removeItem", AvatarKey); }
+        catch { /* ignore */ }
+    }
 
     private async Task SignOut()
     {

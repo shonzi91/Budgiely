@@ -31,11 +31,11 @@ public static class AccountSnapshotSerializer
         var node = new AccountNode(
             account.Id, account.Name, account.Currency, account.OwnerUserId,
             account.Members.Select(m => new MemberNode(m.Id, m.UserId, m.DisplayName)).ToList(),
-            account.Funds.Select(f => new FundNode(f.Id, f.Name, f.ParentId, f.Note)).ToList(),
+            account.Funds.Select(f => new FundNode(f.Id, f.Name, f.ParentId, f.Note, f.Icon)).ToList(),
             account.Categories.Select(c => new CategoryNode(c.Id, c.Name, c.ParentId, c.Icon)).ToList(),
-            account.SavingCategories.Select(s => new SavingCategoryNode(s.Id, s.Name, s.ParentId, s.GoalAmount, s.AlertThreshold, s.NotifyOnMilestone, s.InitialAmount)).ToList(),
+            account.SavingCategories.Select(s => new SavingCategoryNode(s.Id, s.Name, s.ParentId, s.GoalAmount, s.AlertThreshold, s.NotifyOnMilestone, s.InitialAmount, s.Icon)).ToList(),
             account.Periods.Select(ToNode).ToList(),
-            account.ContributionCategories.Select(c => new ContributionCategoryNode(c.Id, c.Name)).ToList(),
+            account.ContributionCategories.Select(c => new ContributionCategoryNode(c.Id, c.Name, c.Icon)).ToList(),
             account.SavingsRateTarget);
         return JsonSerializer.Serialize(node, Json);
     }
@@ -67,6 +67,7 @@ public static class AccountSnapshotSerializer
         {
             var fund = Build(new Fund(f.Name, f.ParentId), f.Id);
             fund.SetNote(f.Note);
+            fund.SetIcon(f.Icon);
             return fund;
         }).ToList());
         SetField(account, "_categories", node.Categories.Select(c =>
@@ -77,7 +78,12 @@ public static class AccountSnapshotSerializer
         }).ToList());
         SetField(account, "_savingCategories", node.SavingCategories.Select(ToEntity).ToList());
         SetField(account, "_contributionCategories",
-            (node.ContributionCategories ?? []).Select(c => Build(new ContributionCategory(c.Name), c.Id)).ToList());
+            (node.ContributionCategories ?? []).Select(c =>
+            {
+                var cc = Build(new ContributionCategory(c.Name), c.Id);
+                cc.SetIcon(c.Icon);
+                return cc;
+            }).ToList());
         SetField(account, "_periods", node.Periods.Select(p => ToEntity(p, node.Currency)).ToList());
         account.SetSavingsRateTarget(node.SavingsRateTarget);
         return account;
@@ -102,6 +108,7 @@ public static class AccountSnapshotSerializer
         var s = Build(new SavingCategory(n.Name, n.ParentId), n.Id);
         s.SetGoal(n.GoalAmount, n.AlertThreshold, n.NotifyOnMilestone);
         if (n.InitialAmount != 0m) s.SetInitialAmount(n.InitialAmount);
+        s.SetIcon(n.Icon);
         return s;
     }
 
@@ -162,10 +169,10 @@ public static class AccountSnapshotSerializer
         decimal SavingsRateTarget = 0.20m);
 
     private record MemberNode(Guid Id, Guid UserId, string DisplayName);
-    private record ContributionCategoryNode(Guid Id, string Name);
-    private record FundNode(Guid Id, string Name, Guid? ParentId, string? Note = null);
+    private record ContributionCategoryNode(Guid Id, string Name, string? Icon = null);
+    private record FundNode(Guid Id, string Name, Guid? ParentId, string? Note = null, string? Icon = null);
     private record CategoryNode(Guid Id, string Name, Guid? ParentId, string? Icon = null);
-    private record SavingCategoryNode(Guid Id, string Name, Guid? ParentId, decimal? GoalAmount, decimal AlertThreshold, bool NotifyOnMilestone, decimal InitialAmount);
+    private record SavingCategoryNode(Guid Id, string Name, Guid? ParentId, decimal? GoalAmount, decimal AlertThreshold, bool NotifyOnMilestone, decimal InitialAmount, string? Icon = null);
 
     private record PeriodNode(Guid Id, string Currency, DateOnly From, DateOnly To, PeriodStatus Status, decimal CarriedIn,
         List<InitialBalanceNode> InitialBalances, List<ContributionNode> Contributions, List<BudgetNode> Budgets,
