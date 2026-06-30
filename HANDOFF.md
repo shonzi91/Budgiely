@@ -56,6 +56,24 @@ mint/cream look. **Everything is derived from existing domain reads — no domai
 - **Possible follow-ups:** add an InsightsService unit test (no test project covers Shared.UI today); localize the generated
   sentences; a "How it's calculated" expander for the score; the savings gauge track is fixed at 0–40% (clamps if target > 40%).
 
+## Session 12i (2026-06-30) — UI-simplification Phases 2–4: 6 tabs → 4. UI-only. 114 tests.
+Finished the simplification. Tab bar is now **Home · Spending · Savings · Setup** (`Tab` enum = {Overview, Account,
+Budgets, Savings}; labels remap: Overview→"Home", Budgets→"Spending", Account→"Setup"; `Tab.Expenses` removed).
+- **Phase 2 — Spending (merge Budgets + Expenses):** one panel under `Tab.Budgets`. Budget rings on top (with a
+  "This month's budgets · €X of €Y spent" header instead of the card strip), then the big **Add expense** button, then the
+  expense list (the day/grouped/calendar views + the `row` fragment, moved verbatim from the old Expenses panel). The
+  Expenses tab/panel are gone. `ShowExpensesTab()` now sets `_tab = Tab.Budgets` (still used by phone-init + the Spending
+  tab button so it lands on today's day-view). `OpenAddExpenseTab` unchanged (just opens the modal).
+- **Phase 3 — Setup (reshape Account):** removed the duplicate card strip; added a **People** panel (member avatars +
+  Invite) at the top; **Funds → "Where your money is"**; the transfer form + log are collapsed behind a **"🔁 Move money"**
+  toggle (`_moveOpen`, reuses `.home-more-toggle`); **Contributions → "Income"**. Per-row fund/income actions kept as-is.
+- **Phase 4 — balance in the header:** `.head-right` now shows **Current + "€X free"** (replaced the "Opening" figure); the
+  redundant "Current" card was dropped from Home (its strip is now `cards-3`: Saved · Spent · Score). Savings tab keeps its
+  own Total-saved/Saved-this-period cards (savings-specific, not the balance).
+- **Files:** `Pages/Dashboard.razor`(+`.css`), `Services/Localizer.cs`. New fields `_moveOpen`. New CSS `.cards-3`,
+  `.people-row`/`.person`, `.spending-head`/`.spending-sub`, `.bal-current`/`.bal-free`. No domain/server changes. 114 tests.
+  Possible follow-ups: collapse per-row icon buttons into a "⋯" (funds/income rows still show ✏️🗑️🔁➕); friendlier first-run.
+
 ## Session 12h (2026-06-30) — UI-simplification Phase 1: merge Insights into Home. UI-only. 114 tests.
 Acting on a "make it simpler/friendlier" review (mocks shown to the user). Agreed target: **6 tabs → 4** (Home,
 Spending, Savings, Setup), balance in the header, one primary action per screen, fewer per-row buttons, advanced

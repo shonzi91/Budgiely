@@ -60,6 +60,9 @@
 .balances { display: flex; gap: 16px; align-items: center; }
 .bal { display: flex; flex-direction: column; align-items: flex-end; font-size: .95rem; }
 .bal-label { color: #6b7280; font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; }
+.bal-current strong { font-size: 1.15rem; }
+.bal-free { color: #6b7280; font-size: .72rem; }
+.bal-free.warn-text { color: #b45309; }
 
 .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #eceef2; }
 .tab {
@@ -80,6 +83,7 @@
 
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .cards.cards-2 { grid-template-columns: repeat(2, 1fr); }
+.cards.cards-3 { grid-template-columns: repeat(3, 1fr); }
 .card {
     background: #fff; border: 1px solid #eceef2; border-radius: 14px;
     padding: 14px; display: flex; flex-direction: column; gap: 6px;
@@ -652,6 +656,15 @@ input[type=date]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgrou
     flex-shrink: 0; margin-top: 1px;
 }
 .win-text { font-size: .85rem; color: #374151; line-height: 1.45; }
+
+/* Setup tab — People row */
+.people-row { display: flex; flex-wrap: wrap; gap: 14px 18px; }
+.person { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; }
+
+/* Spending tab — budget section header */
+.spending-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.spending-head .insight-h { margin: 0; }
+.spending-sub { font-size: .82rem; color: #6b7280; }
 
 /* Home tab — collapsible insights deep-dive */
 .home-more-toggle {

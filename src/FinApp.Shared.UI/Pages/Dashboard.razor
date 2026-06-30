@@ -97,7 +97,14 @@ else
         <div class="head-right">
             <span class="status">@Loc[State.IsPeriodOpen ? "Active" : "Closed"]</span>
             <div class="balances">
-                <span class="bal" title="@Loc["Sum of the period's opening fund values"]"><span class="bal-label">@Loc["Opening"]</span> <strong>@Fmt(State.OpeningBalance)</strong></span>
+                <span class="bal bal-current">
+                    <span class="bal-label">@Loc[State.IsPeriodOpen ? "Current" : "Closed on"]</span>
+                    <strong>@Fmt(State.ClosingBalance)</strong>
+                    @if (State.IsPeriodOpen)
+                    {
+                        <span class="bal-free @(State.IsOverAllocated ? "warn-text" : "")">@Fmt(State.FreeToAllocate) @Loc["free"]</span>
+                    }
+                </span>
             </div>
         </div>
     </header>
@@ -111,10 +118,9 @@ else
 
     <nav class="tabs">
         <button class="tab @(_tab == Tab.Overview ? "active" : "")" @onclick="() => _tab = Tab.Overview">@Loc["Home"]</button>
-        <button class="tab @(_tab == Tab.Account ? "active" : "")" @onclick="() => _tab = Tab.Account">@Loc["Account"]</button>
-        <button class="tab @(_tab == Tab.Budgets ? "active" : "")" @onclick="() => _tab = Tab.Budgets">@Loc["Budgets"]</button>
-        <button class="tab @(_tab == Tab.Expenses ? "active" : "")" @onclick="ShowExpensesTab">@Loc["Expenses"]</button>
+        <button class="tab @(_tab == Tab.Budgets ? "active" : "")" @onclick="ShowExpensesTab">@Loc["Spending"]</button>
         <button class="tab @(_tab == Tab.Savings ? "active" : "")" @onclick="() => _tab = Tab.Savings">@Loc["Savings"]</button>
+        <button class="tab @(_tab == Tab.Account ? "active" : "")" @onclick="() => _tab = Tab.Account">@Loc["Setup"]</button>
     </nav>
 
     @{
@@ -146,15 +152,7 @@ else
     <div class="tab-content">
         <div class="tabpanel" hidden="@(_tab != Tab.Overview)">
             @{ var ov = _insights.Build(State.Account, State.PeriodNumber - 1, Fmt, Loc.T); }
-            <section class="cards">
-                <div class="card">
-                    <span class="card-label">@Loc[State.IsPeriodOpen ? "Current" : "Closed on"]</span>
-                    <span class="card-value">@Fmt(State.ClosingBalance)</span>
-                    @if (State.IsPeriodOpen)
-                    {
-                        <span class="card-sub @(State.IsOverAllocated ? "warn-text" : "")">@Fmt(State.FreeToAllocate) @Loc["free to allocate"]</span>
-                    }
-                </div>
+            <section class="cards cards-3">
                 <div class="card savings">
                     <span class="card-label">@Loc["Saved this period"]</span>
                     <span class="card-value">@Fmt(State.SavingsThisPeriod)</span>
@@ -318,27 +316,15 @@ else
             }
         </div>
         <div class="tabpanel" hidden="@(_tab != Tab.Account)">
-            <section class="cards">
-                <div class="card">
-                    <span class="card-label">@Loc[State.IsPeriodOpen ? "Current" : "Closed on"]</span>
-                    <span class="card-value">@Fmt(State.ClosingBalance)</span>
-                    @if (State.IsPeriodOpen)
-                    {
-                        <span class="card-sub @(State.IsOverAllocated ? "warn-text" : "")">@Fmt(State.FreeToAllocate) @Loc["free to allocate"]</span>
-                    }
+            <section class="panel people-panel">
+                <div class="panel-head">
+                    <h2>@Loc["People"]</h2>
+                    <button class="link" title="@Loc["Invite a contributor"]" @onclick="OpenInvite">➕ @Loc["Invite"]</button>
                 </div>
-                <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
-                <div class="card"><span class="card-label">@Loc["Budgeted"]</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
-                <div class="card savings">
-                    <span class="card-label">@Loc["Saved this period"]</span>
-                    <span class="card-value">@Fmt(State.SavingsThisPeriod)</span>
-                    @if (State.HasDeficit)
+                <div class="people-row">
+                    @foreach (var m in State.Members)
                     {
-                        <span class="card-sub warn-text">@Fmt(State.Deficit) @Loc["not backed by cash"]</span>
-                    }
-                    else
-                    {
-                        <span class="card-sub">@PctOrDash(State.PeriodSavingsRate) @Loc["of contributions"]</span>
+                        <span class="person"><Avatar Name="@State.MemberName(m.UserId)" Picture="@State.MemberAvatar(m.UserId)" Size="26" /> @State.MemberName(m.UserId)</span>
                     }
                 </div>
             </section>
@@ -353,7 +339,7 @@ else
 
             <section class="panel">
                 <div class="panel-head">
-                    <h2>@Loc["Funds"]</h2>
+                    <h2>@Loc["Where your money is"]</h2>
                     <span class="head-actions">
                         <button class="link" title="@Loc["Add a fund"]" @onclick="OpenAddFund">➕</button>
                     </span>
@@ -394,8 +380,11 @@ else
             @if (CanTransfer || MergedTransfers().Count > 0)
             {
                 var transfers = MergedTransfers();
-                <section class="panel">
-                    <h2>@Loc["Transfer money"]</h2>
+                <button class="home-more-toggle" @onclick="() => _moveOpen = !_moveOpen">
+                    <span>🔁 @Loc["Move money"]</span>
+                    <span class="home-more-chevron">@(_moveOpen ? "▲" : "▼")</span>
+                </button>
+                <section class="panel" hidden="@(!_moveOpen)">
                     @if (CanTransfer)
                     {
                         <div class="form transfer-form">
@@ -472,7 +461,7 @@ else
 
             <section class="panel">
                 <div class="panel-head">
-                    <h2>@Loc["Contributions"]</h2>
+                    <h2>@Loc["Income"]</h2>
                     @if (State.IsPeriodOpen)
                     {
                         <span class="head-actions">
@@ -506,11 +495,11 @@ else
 
         </div>
         <div class="tabpanel" hidden="@(_tab != Tab.Budgets)">
-            <section class="cards cards-2">
-                <div class="card"><span class="card-label">@Loc["Budgeted"]</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
-                <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
-            </section>
             <section class="panel">
+                <div class="spending-head">
+                    <span class="insight-h">@Loc["This month's budgets"]</span>
+                    <span class="spending-sub">@Fmt(State.TotalSpent) @Loc["of"] @Fmt(State.TotalBudgeted) @Loc["spent"]</span>
+                </div>
                 @{
                     // Top-level categories only — sub-categories roll up into their parent's ring.
                     var budgeted = State.CategoryOptions.Where(c => c.Depth == 0 && State.HasBudget(c.Category.Id)).ToList();
@@ -552,12 +541,7 @@ else
                     </div>
                 </div>
             </section>
-        </div>
-        <div class="tabpanel" hidden="@(_tab != Tab.Expenses)">
-            <section class="cards cards-2">
-                <div class="card"><span class="card-label">@Loc["Budgeted"]</span><span class="card-value">@Fmt(State.TotalBudgeted)</span></div>
-                <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
-            </section>
+
             @if (State.IsPeriodOpen)
             {
                 <button class="big-add" @onclick="OpenAddExpenseTab">🧾 @Loc["Add expense"]</button>
@@ -1511,10 +1495,11 @@ else
 
 @code {
     private enum Modal { None, AddCat, EditCat, DeleteCat, CategoryDetail, AddAccount, EditAccount, DeleteAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, SettleExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, Transfer, Deposit, EditDeposit, DeleteDeposit, ManageContribCats, ContribCat, DeleteContribCat, AddSaving, BudgetSaving, SpendSaving, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
-    private enum Tab { Overview, Account, Budgets, Expenses, Savings }
+    private enum Tab { Overview, Account, Budgets, Savings }
 
     private Tab _tab = Tab.Overview;
     private bool _homeInsightsOpen;
+    private bool _moveOpen;
     private readonly InsightsService _insights = new();
 
     private Guid _categoryId;
@@ -1667,10 +1652,10 @@ else
         catch { /* host without the helper (e.g. MAUI) — stay on Account */ }
     }
 
-    /// <summary>Open the Expenses tab focused on today (clamped into the current period). Feature 6.</summary>
+    /// <summary>Open the Spending tab focused on today's expenses (clamped into the current period).</summary>
     private void ShowExpensesTab()
     {
-        _tab = Tab.Expenses;
+        _tab = Tab.Budgets;
         _calendar = false;
         _dayView = ClampToPeriod(DateOnly.FromDateTime(DateTime.Today));   // default to today's day view
     }

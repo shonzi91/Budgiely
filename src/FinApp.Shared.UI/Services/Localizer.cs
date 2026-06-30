@@ -122,6 +122,17 @@ public sealed class Localizer(IJSRuntime js)
         ["Insights"] = "Анализи",
         ["Overview"] = "Преглед",
         ["Home"] = "Начало",
+        ["Spending"] = "Разходи",
+        ["Setup"] = "Настройки",
+        ["This month's budgets"] = "Бюджети за месеца",
+        ["People"] = "Хора",
+        ["Invite"] = "Покани",
+        ["Where your money is"] = "Къде са парите ви",
+        ["Move money"] = "Премести пари",
+        ["Income"] = "Приходи",
+        ["free"] = "свободни",
+        ["of"] = "от",
+        ["spent"] = "похарчени",
         ["Trends, savings rate & score"] = "Тенденции, норма на спестяване и оценка",
 
         // Overview tab
