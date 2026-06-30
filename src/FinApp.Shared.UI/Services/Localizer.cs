@@ -105,6 +105,19 @@ public sealed class Localizer(IJSRuntime js)
         ["Expenses"] = "Разходи",
         ["Savings"] = "Спестявания",
         ["Insights"] = "Анализи",
+        ["Overview"] = "Преглед",
+
+        // Overview tab
+        ["Health score"] = "Оценка на здравето",
+        ["Needs your attention"] = "Изисква внимание",
+        ["All clear — no warnings this period. Nice work."] = "Всичко е наред — няма предупреждения този период. Браво!",
+        ["Top spending"] = "Най-големи разходи",
+        ["Log some income or expenses to see your account overview here."] =
+            "Въведете приходи или разходи, за да видите преглед на профила тук.",
+        ["Overspent budgets"] = "Преразходени бюджети",
+        ["avg"] = "ср.",
+        ["above average"] = "над средното",
+        ["below average"] = "под средното",
 
         // Insights / financial-health tab
         ["Your score this period"] = "Вашата оценка за периода",

@@ -68,9 +68,9 @@ else
                 </span>
             </div>
             <div class="period-nav">
-                <button class="nav" title="Previous period" @onclick="State.GoPrev" disabled="@(!State.CanGoPrev)">◀</button>
+                <button class="nav" title="Previous period" @onclick="State.GoPrev" disabled="@(!State.CanGoPrev)">‹</button>
                 <div class="period-row">
-                    <button class="period period-btn" title="@Loc["Edit period dates"]" @onclick="OpenEditPeriod">@State.Period.From.ToString("dd MMM") – @State.Period.To.ToString("dd MMM yyyy") (@State.PeriodNumber/@State.PeriodCount)</button>
+                    <button class="period period-btn" title="@Loc["Edit period dates"]" @onclick="OpenEditPeriod">@State.Period.From.ToString("dd MMM") – @State.Period.To.ToString("dd MMM yyyy")</button>
                     <span class="period-ops">
                         @if (State.IsLatestPeriod && State.PeriodCount > 1)
                         {
@@ -82,7 +82,7 @@ else
                         }
                     </span>
                 </div>
-                <button class="nav" title="Next period" @onclick="State.GoNext" disabled="@(!State.CanGoNext)">▶</button>
+                <button class="nav" title="Next period" @onclick="State.GoNext" disabled="@(!State.CanGoNext)">›</button>
             </div>
         </div>
         <div class="head-right">
@@ -101,6 +101,7 @@ else
     }
 
     <nav class="tabs">
+        <button class="tab @(_tab == Tab.Overview ? "active" : "")" @onclick="() => _tab = Tab.Overview">@Loc["Overview"]</button>
         <button class="tab @(_tab == Tab.Account ? "active" : "")" @onclick="() => _tab = Tab.Account">@Loc["Account"]</button>
         <button class="tab @(_tab == Tab.Budgets ? "active" : "")" @onclick="() => _tab = Tab.Budgets">@Loc["Budgets"]</button>
         <button class="tab @(_tab == Tab.Expenses ? "active" : "")" @onclick="ShowExpensesTab">@Loc["Expenses"]</button>
@@ -108,7 +109,142 @@ else
         <button class="tab @(_tab == Tab.Insights ? "active" : "")" @onclick="() => _tab = Tab.Insights">@Loc["Insights"]</button>
     </nav>
 
+    @{
+        RenderFragment<Signal> signalCard = s =>
+        @<div class="insight">
+            <div class="insight-icon @(s.Kind switch { SignalKind.Good => "icon-good", SignalKind.Info => "icon-info", _ => "icon-warn" })">@(s.Kind switch { SignalKind.Good => "✓", SignalKind.Info => "ℹ", _ => "⚠️" })</div>
+            <div class="insight-body">
+                @if (s.Details is { Count: > 0 } dets)
+                {
+                    <details class="insight-exp">
+                        <summary>
+                            <span class="insight-title">@s.Title</span>
+                            <span class="insight-desc">@s.Desc</span>
+                        </summary>
+                        <ul class="insight-detail-list">
+                            @foreach (var d in dets)
+                            {
+                                <li>@d</li>
+                            }
+                        </ul>
+                    </details>
+                }
+                else
+                {
+                    <div class="insight-title">@s.Title</div>
+                    <div class="insight-desc">@s.Desc</div>
+                }
+            </div>
+            <div class="insight-delta @(s.Dir switch { DeltaDir.Up => "delta-up", DeltaDir.Down => "delta-down", _ => "delta-flat" })">@s.Delta</div>
+        </div>;
+    }
+
     <div class="tab-content">
+        <div class="tabpanel" hidden="@(_tab != Tab.Overview)">
+            @{ var ov = _insights.Build(State.Account, State.PeriodNumber - 1, Fmt); }
+            <section class="cards">
+                <div class="card">
+                    <span class="card-label">@Loc[State.IsPeriodOpen ? "Current" : "Closed on"]</span>
+                    <span class="card-value">@Fmt(State.ClosingBalance)</span>
+                    @if (State.IsPeriodOpen)
+                    {
+                        <span class="card-sub @(State.IsOverAllocated ? "warn-text" : "")">@Fmt(State.FreeToAllocate) @Loc["free to allocate"]</span>
+                    }
+                </div>
+                <div class="card savings">
+                    <span class="card-label">@Loc["Saved this period"]</span>
+                    <span class="card-value">@Fmt(State.SavingsThisPeriod)</span>
+                    <span class="card-sub">@PctOrDash(State.PeriodSavingsRate) @Loc["of contributions"]</span>
+                </div>
+                <div class="card"><span class="card-label">@Loc["Spent"]</span><span class="card-value">@Fmt(State.TotalSpent)</span></div>
+                @{ var ovBand = ov.Band switch { HealthBand.Healthy => "score-ok", HealthBand.Average => "score-warn", _ => "score-bad" }; }
+                <button class="card card-score" @onclick="() => _tab = Tab.Insights">
+                    <span class="card-label">@Loc["Health score"]</span>
+                    <span class="card-value @ovBand">@(ov.HasData ? ov.Score.ToString() : "—")</span>
+                    <span class="card-sub">@(ov.HasData ? ov.Verdict : "") ›</span>
+                </button>
+            </section>
+
+            @if (!ov.HasData)
+            {
+                <section class="panel insight-empty">
+                    <p>📊 @Loc["Log some income or expenses to see your account overview here."]</p>
+                </section>
+            }
+            else
+            {
+                var warnings = ov.Signals.Where(s => s.Kind == SignalKind.Warn).ToList();
+                <h2 class="insight-h">@Loc["Needs your attention"]</h2>
+                @if (warnings.Count > 0)
+                {
+                    <div class="insight-list">
+                        @foreach (var s in warnings)
+                        {
+                            @signalCard(s)
+                        }
+                    </div>
+                }
+                else
+                {
+                    <section class="panel all-clear"><p>✅ @Loc["All clear — no warnings this period. Nice work."]</p></section>
+                }
+
+                var overspent = State.CategoryOptions.Where(c => State.HasBudget(c.Category.Id) && State.Coverage(c.Category.Id).IsOverBudget).ToList();
+                @if (overspent.Count > 0)
+                {
+                    <h2 class="insight-h">@Loc["Overspent budgets"]</h2>
+                    <div class="ring-grid">
+                        @foreach (var (cat, _) in overspent)
+                        {
+                            var cov = State.Coverage(cat.Id);
+                            var catId = cat.Id;
+                            <div class="ring-card ring-card-lg">
+                                <ProgressRing Percent="@((double)(cov.Percent ?? 0))" Class="over">
+                                    <button class="ring-ico-big" title="@Loc["Manage category"]" @onclick="() => OpenCategoryDetail(catId)">@State.CategoryIcon(catId)</button>
+                                    <button class="ring-name" title="@Loc["Manage category"]" @onclick="() => OpenCategoryDetail(catId)">@cat.Name</button>
+                                </ProgressRing>
+                                <div class="ring-label over-text"><span>@Fmt(cov.Spent) / @Fmt(cov.Allocated)</span></div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (ov.QuickWins.Count > 0)
+                {
+                    <h2 class="insight-h">@Loc["Quick wins"]</h2>
+                    <div class="win-list">
+                        @{ var qn = 0; }
+                        @foreach (var w in ov.QuickWins)
+                        {
+                            qn++;
+                            <div class="win"><div class="win-bullet">@qn</div><div class="win-text">@w.Text</div></div>
+                        }
+                    </div>
+                }
+
+                @if (ov.Breakdown.Count > 0)
+                {
+                    <h2 class="insight-h">@Loc["Top spending"]</h2>
+                    <section class="panel breakdown-card">
+                        @foreach (var c in ov.Breakdown.Take(5))
+                        {
+                            <div class="breakdown-row">
+                                <div class="breakdown-cat">
+                                    <span class="cat-dot" style="background:@c.ColorHex"></span>
+                                    <span class="cat-ico">@c.Icon</span>
+                                    <span class="breakdown-name">@c.Name</span>
+                                </div>
+                                <div class="breakdown-bar-wrap">
+                                    <div class="breakdown-bar-bg"></div>
+                                    <div class="breakdown-bar-fill" style="background:@c.ColorHex; width:@((double)c.BarFraction * 100)%"></div>
+                                </div>
+                                <div class="breakdown-amount">@Fmt(c.Amount)</div>
+                            </div>
+                        }
+                    </section>
+                }
+            }
+        </div>
         <div class="tabpanel" hidden="@(_tab != Tab.Account)">
             <section class="cards">
                 <div class="card">
@@ -317,9 +453,10 @@ else
                         var cov = State.Coverage(cat.Id);
                         var cls = cov.IsOverBudget ? "over" : cov.ThresholdReached ? "warn" : "ok";
                         var catId = cat.Id;
-                        <div class="ring-card">
+                        <div class="ring-card ring-card-lg">
                             <ProgressRing Percent="@((double)(cov.Percent ?? 0))" Class="@cls">
-                                <button class="ring-name" title="@Loc["Manage category"]" @onclick="() => OpenCategoryDetail(catId)"><span class="cat-ico">@State.CategoryIcon(catId)</span> @cat.Name</button>
+                                <button class="ring-ico-big" title="@Loc["Manage category"]" @onclick="() => OpenCategoryDetail(catId)">@State.CategoryIcon(catId)</button>
+                                <button class="ring-name" title="@Loc["Manage category"]" @onclick="() => OpenCategoryDetail(catId)">@cat.Name</button>
                                 @if (State.IsPeriodOpen)
                                 {
                                     <button class="ring-add" title="@Loc["Add expense"]" @onclick="() => OpenAddExpense(catId)">🧾</button>
@@ -597,17 +734,7 @@ else
                     <div class="insight-list">
                         @foreach (var s in report.Signals)
                         {
-                            var ico = s.Kind switch { SignalKind.Good => "icon-good", SignalKind.Info => "icon-info", _ => "icon-warn" };
-                            var glyph = s.Kind switch { SignalKind.Good => "✓", SignalKind.Info => "ℹ", _ => "⚠️" };
-                            var dcls = s.Dir switch { DeltaDir.Up => "delta-up", DeltaDir.Down => "delta-down", _ => "delta-flat" };
-                            <div class="insight">
-                                <div class="insight-icon @ico">@glyph</div>
-                                <div class="insight-body">
-                                    <div class="insight-title">@s.Title</div>
-                                    <div class="insight-desc">@s.Desc</div>
-                                </div>
-                                <div class="insight-delta @dcls">@s.Delta</div>
-                            </div>
+                            @signalCard(s)
                         }
                     </div>
                 }
@@ -645,15 +772,15 @@ else
                         <span class="savings-target">@Loc["Target:"] <span>@PctText(report.SavingsTarget)</span></span>
                     </div>
                     @{
-                        var rateW = Math.Clamp((double)(report.SavingsRate ?? 0m) / 0.40 * 100, 0, 100);
-                        var goalW = Math.Clamp((double)report.SavingsTarget / 0.40 * 100, 0, 100);
+                        var rateW = Math.Clamp((double)(report.SavingsRate ?? 0m) * 100, 0, 100);
+                        var goalW = Math.Clamp((double)report.SavingsTarget * 100, 0, 100);
                     }
                     <div class="savings-track">
                         <div class="savings-fill" style="width:@rateW%"></div>
                         <div class="savings-goal-line" style="left:@goalW%"></div>
                     </div>
                     <div class="savings-footer">
-                        <span>0%</span><span class="goal-label">@Loc["Goal"] @PctText(report.SavingsTarget)</span><span>40%</span>
+                        <span>0%</span><span class="goal-label">@Loc["Goal"] @PctText(report.SavingsTarget)</span><span>100%</span>
                     </div>
                     <div class="savings-critique">💡 @report.SavingsCritique</div>
                 </section>
@@ -664,16 +791,20 @@ else
                     <h2 class="insight-h">@Loc["Spending trend"]</h2>
                     <section class="panel trend-card">
                         <div class="trend-head">
-                            <span>@Loc["Monthly outgoings"]</span>
-                            <span class="trend-dir @(report.TrendUp ? "up" : "down")">@(report.TrendUp ? "↑" : "↓") @(report.TrendUp ? Loc["trending up"] : Loc["trending down"])</span>
+                            <span>@Loc["Monthly outgoings"] · @Loc["avg"] @Fmt(report.TrendAverage)</span>
+                            <span class="trend-dir @(report.TrendUp ? "up" : "down")">@(report.TrendUp ? "↑" : "↓") @(report.TrendUp ? Loc["above average"] : Loc["below average"])</span>
                         </div>
-                        <div class="mini-bar-chart">
+                        <div class="trend-plot">
+                            <div class="trend-avg" style="bottom:@((Math.Clamp((double)report.TrendAvgFraction, 0, 1) * 72).ToString(System.Globalization.CultureInfo.InvariantCulture))px"></div>
                             @foreach (var t in report.Trend)
                             {
-                                <div class="mini-bar-col">
-                                    <div class="mini-bar @(t.IsCurrent ? "current" : "")" style="height:@(Math.Max(2.0, (double)t.BarFraction * 60))px"></div>
-                                    <div class="mini-bar-month">@t.Label</div>
-                                </div>
+                                <div class="trend-bar @(t.IsCurrent ? "current" : "")" style="height:@(Math.Max(3.0, (double)t.BarFraction * 72).ToString(System.Globalization.CultureInfo.InvariantCulture))px" title="@t.Label: @Fmt(t.Outgoings)/mo"></div>
+                            }
+                        </div>
+                        <div class="trend-labels">
+                            @foreach (var t in report.Trend)
+                            {
+                                <span class="@(t.IsCurrent ? "cur" : "")">@t.Label</span>
                             }
                         </div>
                         <div class="trend-note">@report.TrendNote</div>
@@ -1429,9 +1560,9 @@ else
 
 @code {
     private enum Modal { None, AddCat, EditCat, DeleteCat, CategoryDetail, AddAccount, EditAccount, DeleteAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, SettleExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, Transfer, Deposit, EditDeposit, DeleteDeposit, ManageContribCats, ContribCat, DeleteContribCat, AddSaving, BudgetSaving, SpendSaving, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
-    private enum Tab { Account, Budgets, Expenses, Savings, Insights }
+    private enum Tab { Overview, Account, Budgets, Expenses, Savings, Insights }
 
-    private Tab _tab = Tab.Account;
+    private Tab _tab = Tab.Overview;
     private readonly InsightsService _insights = new();
 
     private Guid _categoryId;

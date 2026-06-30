@@ -16,7 +16,8 @@ public enum HealthBand { AtRisk, Average, Healthy }
 /// <summary>Kind of signal card (matches the template's warn / good / info icon tints).</summary>
 public enum SignalKind { Warn, Good, Info }
 
-public sealed record Signal(SignalKind Kind, string Title, string Desc, string Delta, DeltaDir Dir);
+public sealed record Signal(SignalKind Kind, string Title, string Desc, string Delta, DeltaDir Dir,
+    IReadOnlyList<string>? Details = null);
 
 public sealed record CategorySpend(string Name, string Icon, Money Amount, decimal BarFraction, DeltaDir Dir, string ColorHex);
 
@@ -42,6 +43,8 @@ public sealed record FinancialHealthReport(
     string SavingsCritique,
     bool TrendUp,
     string TrendNote,
+    Money TrendAverage,
+    decimal TrendAvgFraction,
     IReadOnlyList<Signal> Signals,
     IReadOnlyList<CategorySpend> Breakdown,
     IReadOnlyList<TrendPoint> Trend,
@@ -84,7 +87,7 @@ public sealed class InsightsService
         var savingsRate = _savings.PeriodSavingsRate(p);
 
         var breakdown = BuildBreakdown(account, periods, periodIndex);
-        var trend = BuildTrend(periods, periodIndex, currency);
+        var trend = BuildTrend(periods, periodIndex, currency, fmt);
 
         var score = ComputeScore(account, periodIndex, target);
         int? delta = periodIndex > 0 ? score - ComputeScore(account, periodIndex - 1, target) : null;
@@ -101,8 +104,6 @@ public sealed class InsightsService
         }
         var savingsCritique = SavingsCritique(savingsRate, shortfall, target, fmt);
 
-        var (trendUp, trendNote) = TrendNarrative(trend, fmt);
-
         var signals = BuildSignals(account, periods, periodIndex, savingsRate, target, fmt);
         var wins = BuildQuickWins(account, p, savingsRate, income, target, fmt);
 
@@ -118,11 +119,13 @@ public sealed class InsightsService
             SavingsTarget: target,
             SavingsShortfall: shortfall,
             SavingsCritique: savingsCritique,
-            TrendUp: trendUp,
-            TrendNote: trendNote,
+            TrendUp: trend.Up,
+            TrendNote: trend.Note,
+            TrendAverage: trend.Average,
+            TrendAvgFraction: trend.AvgFraction,
             Signals: signals,
             Breakdown: breakdown,
-            Trend: trend,
+            Trend: trend.Points,
             QuickWins: wins);
     }
 
@@ -130,6 +133,7 @@ public sealed class InsightsService
         HasData: false, PeriodLabel: "", Score: 0, ScoreDelta: null, Band: HealthBand.Average,
         Verdict: "", Summary: "", SavingsRate: null, SavingsTarget: DefaultSavingsTarget,
         SavingsShortfall: null, SavingsCritique: "", TrendUp: false, TrendNote: "",
+        TrendAverage: Money.Zero(currency), TrendAvgFraction: 0m,
         Signals: [], Breakdown: [], Trend: [], QuickWins: []);
 
     // --- Score (0..100, four equally-weighted 25-pt components) ----------------------------------
@@ -138,10 +142,13 @@ public sealed class InsightsService
     {
         var p = account.Periods[idx];
 
-        // 1) Savings vs target.
+        // 1) Savings: blend "hit your target" with the absolute rate (0..100%) so it's not too forgiving —
+        //    reaching a 20% target no longer maxes the component; high absolute rates are still rewarded.
         var rate = _savings.PeriodSavingsRate(p) ?? 0m;
         if (rate < 0m) rate = 0m;
-        var sav = Math.Min(1m, target <= 0m ? 1m : rate / target) * 25m;
+        var towardTarget = Math.Min(1m, target <= 0m ? 1m : rate / target);
+        var absolute = Math.Min(1m, rate);
+        var sav = (0.6m * towardTarget + 0.4m * absolute) * 25m;
 
         // 2) Budget adherence (neutral when nothing is budgeted — can't assess).
         decimal adh;
@@ -268,35 +275,47 @@ public sealed class InsightsService
         return change > 0.05m ? DeltaDir.Up : change < -0.05m ? DeltaDir.Down : DeltaDir.Flat;
     }
 
-    // --- 6-period outgoings trend ---------------------------------------------------------------
+    // --- Outgoings trend (per-month-normalized so uneven period lengths compare fairly) ---------
 
-    private static IReadOnlyList<TrendPoint> BuildTrend(IReadOnlyList<Period> periods, int idx, string currency)
+    private const decimal DaysPerMonth = 30.44m;
+
+    /// <summary>The period's spend scaled to a whole month (so a 10-day or 45-day period reads as €/month).</summary>
+    private static decimal MonthlySpend(Period p)
     {
-        var start = Math.Max(0, idx - 5);
-        var slice = new List<Period>();
-        for (var i = start; i <= idx; i++) slice.Add(periods[i]);
-        var max = slice.Count > 0 ? slice.Max(p => p.ExpensesTotal.Amount) : 0m;
-
-        return slice.Select(p => new TrendPoint(
-            p.From.ToString("MMM", CultureInfo.InvariantCulture),
-            p.ExpensesTotal,
-            max > 0m ? p.ExpensesTotal.Amount / max : 0m,
-            p == periods[idx])).ToList();
+        var days = Math.Max(1, p.LengthInDays + 1);
+        return p.ExpensesTotal.Amount / days * DaysPerMonth;
     }
 
-    private static (bool Up, string Note) TrendNarrative(IReadOnlyList<TrendPoint> trend, Func<Money, string> fmt)
+    private static (IReadOnlyList<TrendPoint> Points, Money Average, decimal AvgFraction, bool Up, string Note)
+        BuildTrend(IReadOnlyList<Period> periods, int idx, string currency, Func<Money, string> fmt)
     {
-        if (trend.Count < 2) return (false, "Not enough history yet to spot a trend.");
-        var first = trend[0].Outgoings.Amount;
-        var last = trend[^1].Outgoings.Amount;
-        var diff = last - first;
-        if (Math.Abs(diff) < 1m)
-            return (false, "Your monthly outgoings are holding steady.");
-        var up = diff > 0m;
-        var money = fmt(new Money(Math.Abs(decimal.Round(diff, 2)), trend[^1].Outgoings.Currency));
-        return up
-            ? (true, $"You've spent {money} more per month than {trend.Count} months ago. Worth a second look.")
-            : (false, $"You've trimmed {money} off your monthly outgoings since {trend.Count} months ago. Nice.");
+        var start = Math.Max(0, idx - 5);
+        var monthly = new List<(string Label, decimal M, bool Cur)>();
+        for (var i = start; i <= idx; i++)
+            monthly.Add((periods[i].From.ToString("MMM", CultureInfo.InvariantCulture),
+                decimal.Round(MonthlySpend(periods[i]), 2), i == idx));
+
+        var max = monthly.Count > 0 ? monthly.Max(x => x.M) : 0m;
+        var avg = monthly.Count > 0 ? monthly.Average(x => x.M) : 0m;
+        var avgMoney = new Money(decimal.Round(avg, 2), currency);
+
+        var points = monthly.Select(x => new TrendPoint(
+            x.Label, new Money(x.M, currency), max > 0m ? x.M / max : 0m, x.Cur)).ToList();
+        var avgFraction = max > 0m ? avg / max : 0m;
+
+        // Trend reads the latest month against the rolling average of the window.
+        var diff = monthly.Count > 0 ? monthly[^1].M - avg : 0m;
+        bool up; string note;
+        if (monthly.Count < 2)
+            (up, note) = (false, "Not enough history yet to spot a trend.");
+        else if (Math.Abs(diff) < 1m)
+            (up, note) = (false, $"This month is right around your {monthly.Count}-month average of {fmt(avgMoney)}/mo.");
+        else if (diff > 0m)
+            (up, note) = (true, $"This month is {fmt(new Money(decimal.Round(diff, 2), currency))} above your {monthly.Count}-month average of {fmt(avgMoney)}/mo.");
+        else
+            (up, note) = (false, $"This month is {fmt(new Money(decimal.Round(-diff, 2), currency))} below your {monthly.Count}-month average of {fmt(avgMoney)}/mo.");
+
+        return (points, avgMoney, avgFraction, up, note);
     }
 
     // --- Signals --------------------------------------------------------------------------------
@@ -318,13 +337,19 @@ public sealed class InsightsService
                 $"You've spent {fmt(s.Cur)} on {s.Name} — your recent average is {fmt(s.Avg)}.",
                 $"+{s.Pct}%", DeltaDir.Up));
 
-        // Overspent budgets.
-        var (overCount, overAmount) = Overspends(account, p);
-        if (overCount > 0)
+        // Overspent budgets — expandable to the per-category breakdown.
+        var overspent = OverspentBudgets(account, p);
+        if (overspent.Count > 0)
+        {
+            var overAmount = overspent.Aggregate(Money.Zero(account.Currency), (acc, o) => acc + o.Over);
+            var details = overspent
+                .Select(o => $"{o.Icon} {o.Name} — {fmt(o.Over)} over ({fmt(o.Spent)} / {fmt(o.Allocated)})")
+                .ToList();
             warn.Add(new Signal(SignalKind.Warn,
-                overCount == 1 ? "A budget is overspent" : $"{overCount} budgets overspent",
-                $"You're {fmt(overAmount)} over plan across {(overCount == 1 ? "one category" : $"{overCount} categories")} this month.",
-                "over", DeltaDir.Up));
+                overspent.Count == 1 ? "A budget is overspent" : $"{overspent.Count} budgets overspent",
+                $"You're {fmt(overAmount)} over plan across {(overspent.Count == 1 ? "one category" : $"{overspent.Count} categories")} this month.",
+                "over", DeltaDir.Up, details));
+        }
 
         // No savings set aside.
         if (p.SavingsNetTotal.Amount <= 0m)
@@ -417,16 +442,22 @@ public sealed class InsightsService
         return best;
     }
 
-    private (int Count, Money Amount) Overspends(Account account, Period p)
+    /// <summary>Overspent budgeted categories this period, worst overspend first, with display fields.</summary>
+    private static IReadOnlyList<(string Name, string Icon, Money Spent, Money Allocated, Money Over)>
+        OverspentBudgets(Account account, Period p)
     {
-        var count = 0;
-        var amount = Money.Zero(account.Currency);
+        var list = new List<(string Name, string Icon, Money Spent, Money Allocated, Money Over)>();
         foreach (var b in p.Budgets)
         {
             var spent = SpentInTree(account, p, b.CategoryId);
-            if (spent > b.Allocated) { count++; amount += spent - b.Allocated; }
+            if (spent > b.Allocated)
+            {
+                var cat = account.FindCategory(b.CategoryId);
+                list.Add((cat?.Name ?? "—", CategoryIcons.Effective(cat), spent, b.Allocated, spent - b.Allocated));
+            }
         }
-        return (count, amount);
+        list.Sort((a, b) => b.Over.Amount.CompareTo(a.Over.Amount));
+        return list;
     }
 
     // --- Quick wins -----------------------------------------------------------------------------

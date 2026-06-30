@@ -56,6 +56,33 @@ mint/cream look. **Everything is derived from existing domain reads — no domai
 - **Possible follow-ups:** add an InsightsService unit test (no test project covers Shared.UI today); localize the generated
   sentences; a "How it's calculated" expander for the score; the savings gauge track is fixed at 0–40% (clamps if target > 40%).
 
+## Session 12c (2026-06-30) — Overview tab + Insights/Budgets polish. UI-only. 112 tests.
+Six requests, all UI-layer (no domain/serializer/EF changes):
+1. **Budgets rings redesigned:** bigger cards (`.ring-card-lg` 150px → fewer per row) with the category **icon big & centered
+   inside the ring**, the name beneath it, and the 🧾 add-expense button beneath that — all inside the circle. Spent/budgeted
+   stays just below. New `.ring-ico-big`.
+2. **Period nav:** removed the `(n/n)` count from the date button; arrows are now round chevron buttons (`‹`/`›`, restyled `.nav`).
+3. **Savings-rate bar is now 0–100%** (was 0–40%) so low rates read honestly; the goal marker sits at the target %. The
+   **score's savings component is less forgiving** — `InsightsService.ComputeScore` blends `0.6×(rate/target) + 0.4×min(1,rate)`,
+   so hitting a 20% target no longer maxes that 25-pt component (need high absolute rates for full marks).
+4. **Overspent-budgets signal is expandable** — `Signal.Details` (optional list) renders a `<details>`; the overspent card lists
+   each category `icon name — €X over (spent / budget)`, worst first (`OverspentBudgets` helper).
+5. **Spending trend reworked & monthly-normalized:** each period's spend is scaled to a whole month
+   (`MonthlySpend = spend / (days+1) × 30.44`) so uneven period lengths compare fairly. New bar chart (`.trend-plot`/`.trend-bar`)
+   with a dashed **average reference line** (`.trend-avg`) and month labels; the note compares the latest month to the
+   rolling N-month average. Report gained `TrendAverage` + `TrendAvgFraction`.
+6. **New "Overview" tab (now the default landing on desktop):** at-a-glance dashboard — summary cards (Current/free-to-allocate,
+   Saved+rate, Spent, and a clickable **Health score** card → Insights), **Needs-your-attention** (warning signals, reusing a shared
+   `RenderFragment<Signal> signalCard` so the overspent expander works here too), **Overspent budgets** as red rings, **Quick wins**,
+   and **Top spending** (top 5 categories). Empty-state when no data. Phone init still opens Expenses first (unchanged).
+   `Tab` enum gained `Overview` (first); `_tab` defaults to it.
+- **Razor gotcha (re-confirmed):** inside an `@if{}`/`else{}` code block, a `var x = …;` must be **bare** — `@{ }` there is RZ1010
+  ("Unexpected { after @"). Inside a markup element (`<div>…`), `@{ }` is correct. Bit me on the Overview `overspent` local.
+- **Files:** `Shared.UI/Services/InsightsService.cs` (score, trend, overspent details, report fields), `Shared.UI/Pages/Dashboard.razor`
+  (Overview tab + signalCard fragment + ring/period/savings/trend markup), `Shared.UI/Pages/Dashboard.razor.css` (rings, `.nav`,
+  trend chart, expander, Overview), `Shared.UI/Services/Localizer.cs` (BG strings). No tests added (Insights is UI-layer, untested);
+  112 tests still green.
+
 ## Session 12b (2026-06-30) — distinctive category icons + picker. UI + body-data domain field. 112 tests.
 Categories now carry a display **icon** (emoji) so they're scannable at a glance.
 - **Domain:** `Category.Icon` (string?, nullable) + `SetIcon` (trims; blank → null); `Account.AddCategory(name, parentId, icon)`
