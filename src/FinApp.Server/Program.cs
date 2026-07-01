@@ -4,6 +4,7 @@ using FinApp.Domain.Common;
 using FinApp.Persistence;
 using FinApp.Server.Accounts;
 using FinApp.Server.Auth;
+using FinApp.Server.BankSync;
 using FinApp.Server.Infrastructure;
 using FinApp.Server.Invitations;
 using FinApp.Server.Sync;
@@ -70,12 +71,16 @@ builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AvatarService>();
+builder.Services.AddScoped<ExternalIdentityService>();
 builder.Services.AddScoped<ExternalAuthService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<ArchivedAccountsService>();
 builder.Services.AddScoped<SnapshotService>();
 builder.Services.AddScoped<AccountExportService>();
 builder.Services.AddScoped<InvitationService>();
+builder.Services.AddScoped<EnableBankingClient>();  // mints its own RS256 JWT per call; no shared state to cache
+builder.Services.AddScoped<BankSyncService>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<SyncNotifier>();
 
@@ -135,6 +140,14 @@ using (var scope = app.Services.CreateScope())
     else db.Database.Migrate();
     // Avatars live in a standalone table created idempotently (no EF migration; works on both providers).
     await scope.ServiceProvider.GetRequiredService<AvatarService>().EnsureSchemaAsync();
+    // Bank-sync tables (connections + staged transactions) follow the same idempotent-create pattern.
+    await scope.ServiceProvider.GetRequiredService<BankSyncService>().EnsureSchemaAsync();
+    // External-identity marker table (which users signed up via Google/Facebook) — same pattern.
+    await scope.ServiceProvider.GetRequiredService<ExternalIdentityService>().EnsureSchemaAsync();
+    // Archived-accounts table + purge anything past its 30-day grace window on startup.
+    var archives = scope.ServiceProvider.GetRequiredService<ArchivedAccountsService>();
+    await archives.EnsureSchemaAsync();
+    await archives.PurgeExpiredAsync();
 }
 
 // Translate ApiException into a JSON problem response; everything else bubbles to the default handler.
@@ -207,7 +220,7 @@ auth.MapGet("/external/{provider}", (string provider, HttpContext http, External
 });
 
 auth.MapGet("/external/{provider}/callback", async (string provider, string? code, string? state,
-    HttpContext http, ExternalAuthService ext, AuthService authSvc, AvatarService avatars, IConfiguration cfg, CancellationToken ct) =>
+    HttpContext http, ExternalAuthService ext, AuthService authSvc, AvatarService avatars, ExternalIdentityService identities, IConfiguration cfg, CancellationToken ct) =>
 {
     if (!ext.IsEnabled(provider) || string.IsNullOrEmpty(code)) return Results.Redirect("/?authError=1");
     var expectedState = http.Request.Cookies["finapp_oauth_state"];
@@ -218,6 +231,7 @@ auth.MapGet("/external/{provider}/callback", async (string provider, string? cod
         var redirectUri = ExternalRedirectUri(http, cfg, provider);
         var (email, name, picture) = await ext.CompleteAsync(provider, code, redirectUri, ct);
         var result = await authSvc.FindOrCreateExternalUserAsync(email, name, ct);
+        await identities.MarkAsync(result.UserId, provider, ct);   // so the UI can hide "change password" for them
         // Adopt the provider's profile picture only if the user hasn't set one of their own.
         if (!string.IsNullOrWhiteSpace(picture) && await avatars.GetAsync(result.UserId, ct) is null)
             await avatars.SetAsync(result.UserId, picture, ct);
@@ -227,8 +241,9 @@ auth.MapGet("/external/{provider}/callback", async (string provider, string? cod
     catch { return Results.Redirect("/?authError=1"); }
 });
 
-app.MapGet("/me", async (ClaimsPrincipal user, AvatarService avatars, CancellationToken ct) =>
-        Results.Ok(new UserDto(user.UserId(), user.Username(), user.Email(), await avatars.GetAsync(user.UserId(), ct))))
+app.MapGet("/me", async (ClaimsPrincipal user, AvatarService avatars, ExternalIdentityService identities, CancellationToken ct) =>
+        Results.Ok(new UserDto(user.UserId(), user.Username(), user.Email(),
+            await avatars.GetAsync(user.UserId(), ct), await identities.GetProviderAsync(user.UserId(), ct))))
     .RequireAuthorization();
 
 app.MapPut("/me/avatar", async (SetAvatarRequest req, ClaimsPrincipal user, AvatarService avatars, CancellationToken ct) =>
@@ -260,6 +275,37 @@ accounts.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal user, AccountSe
     return Results.NoContent();
 });
 
+// --- Membership: leave / remove / transfer / archive ---------------------
+accounts.MapGet("/archived", async (ClaimsPrincipal user, AccountService svc, CancellationToken ct) =>
+    Results.Ok(await svc.ListArchivedForUserAsync(user.UserId(), ct)));
+
+accounts.MapPost("/{id:guid}/leave", async (Guid id, LeaveAccountRequest req, ClaimsPrincipal user, AccountService svc, SyncNotifier notifier, CancellationToken ct) =>
+{
+    var result = await svc.LeaveAsync(user.UserId(), id, req.NewOwnerUserId, ct);
+    await notifier.AccountChangedAsync(id, user.UserId());   // remaining members re-pull the new membership/owner
+    return Results.Ok(new { result = result.ToString() });
+});
+
+accounts.MapDelete("/{id:guid}/members/{memberUserId:guid}", async (Guid id, Guid memberUserId, ClaimsPrincipal user, AccountService svc, SyncNotifier notifier, CancellationToken ct) =>
+{
+    await svc.RemoveMemberAsync(user.UserId(), id, memberUserId, ct);
+    await notifier.AccountChangedAsync(id, user.UserId());
+    return Results.NoContent();
+});
+
+accounts.MapPost("/{id:guid}/transfer-ownership", async (Guid id, TransferOwnershipRequest req, ClaimsPrincipal user, AccountService svc, SyncNotifier notifier, CancellationToken ct) =>
+{
+    await svc.TransferOwnershipAsync(user.UserId(), id, req.NewOwnerUserId, ct);
+    await notifier.AccountChangedAsync(id, user.UserId());
+    return Results.NoContent();
+});
+
+accounts.MapPost("/{id:guid}/reactivate", async (Guid id, ClaimsPrincipal user, AccountService svc, CancellationToken ct) =>
+{
+    await svc.ReactivateAsync(user.UserId(), id, ct);
+    return Results.NoContent();
+});
+
 // --- Account snapshot (full aggregate, opaque blob) ----------------------
 accounts.MapGet("/{id:guid}/snapshot", async (Guid id, ClaimsPrincipal user, SnapshotService svc, CancellationToken ct) =>
     Results.Ok(await svc.GetAsync(user.UserId(), id, ct)));
@@ -274,6 +320,41 @@ accounts.MapPut("/{id:guid}/snapshot", async (Guid id, SaveAccountRequest req, C
 // --- Member avatars (for showing profile pictures in member lists) -------
 accounts.MapGet("/{id:guid}/avatars", async (Guid id, ClaimsPrincipal user, AvatarService avatars, CancellationToken ct) =>
     Results.Ok(await avatars.GetForAccountAsync(user.UserId(), id, ct)));
+
+// --- Bank sync (Open Banking via GoCardless) -----------------------------
+accounts.MapGet("/{id:guid}/bank/status", async (Guid id, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+    Results.Ok(await svc.GetStatusAsync(user.UserId(), id, ct)));
+
+accounts.MapGet("/{id:guid}/bank/institutions", async (Guid id, string? country, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+    Results.Ok(await svc.SearchInstitutionsAsync(user.UserId(), id, country ?? "GB", ct)));
+
+accounts.MapPost("/{id:guid}/bank/link", async (Guid id, StartBankLinkRequest req, HttpContext http, ClaimsPrincipal user, BankSyncService svc, IConfiguration cfg, CancellationToken ct) =>
+    Results.Ok(await svc.StartLinkAsync(user.UserId(), id, req, BankCallbackUrl(http, cfg), ct)));
+
+accounts.MapPost("/{id:guid}/bank/sync", async (Guid id, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+{
+    await svc.SyncAsync(user.UserId(), id, ct);
+    return Results.NoContent();
+});
+
+accounts.MapGet("/{id:guid}/bank/pending", async (Guid id, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+    Results.Ok(await svc.GetPendingAsync(user.UserId(), id, ct)));
+
+accounts.MapPost("/{id:guid}/bank/ack", async (Guid id, BankTransactionAck ack, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+{
+    await svc.AckAsync(user.UserId(), id, ack.ExternalId, ack.Confirmed, ct);
+    return Results.NoContent();
+});
+
+// Public: the bank redirects here (with ?code=<auth code>&state=<accountId>) after the user consents. No auth —
+// the code is exchanged with Enable Banking server-side to prove real consent — then we bounce to the SPA.
+app.MapGet("/bank/callback", async (string? code, string? state, BankSyncService svc, CancellationToken ct) =>
+{
+    if (!string.IsNullOrEmpty(code) && Guid.TryParseExact(state, "N", out var accountId)
+        && await svc.CompleteLinkAsync(accountId, code, ct))
+        return Results.Redirect("/?bank=linked");
+    return Results.Redirect("/?bank=error");
+});
 
 // --- Excel export (one sheet per period) ---------------------------------
 accounts.MapGet("/{id:guid}/export", async (Guid id, ClaimsPrincipal user, AccountExportService svc, CancellationToken ct) =>
@@ -325,6 +406,15 @@ static string ExternalRedirectUri(HttpContext http, IConfiguration cfg, string p
     var baseUrl = cfg["Auth:PublicBaseUrl"]?.TrimEnd('/')
                   ?? $"{http.Request.Scheme}://{http.Request.Host}";
     return $"{baseUrl}/auth/external/{provider}/callback";
+}
+
+// Where the bank sends the user back after consent. Shares Auth:PublicBaseUrl so it's correct behind the
+// Cloud Run proxy; this exact URL must be whitelisted for the app in the GoCardless dashboard.
+static string BankCallbackUrl(HttpContext http, IConfiguration cfg)
+{
+    var baseUrl = cfg["Auth:PublicBaseUrl"]?.TrimEnd('/')
+                  ?? $"{http.Request.Scheme}://{http.Request.Host}";
+    return $"{baseUrl}/bank/callback";
 }
 
 /// <summary>Exposed so integration tests can host the app via WebApplicationFactory.</summary>

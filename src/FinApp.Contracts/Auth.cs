@@ -9,8 +9,13 @@ public record LoginRequest(string UsernameOrEmail, string Password);
 /// <summary>Result of register/login: a bearer token plus the authenticated user's identity.</summary>
 public record AuthResponse(string Token, Guid UserId, string Username, string Email, DateTimeOffset ExpiresAt);
 
-/// <summary>A user as seen over the wire (never includes the password hash). <see cref="Avatar"/> is a data-URL profile picture.</summary>
-public record UserDto(Guid Id, string Username, string Email, string? Avatar = null);
+/// <summary>A user as seen over the wire (never includes the password hash). <see cref="Avatar"/> is a data-URL profile picture.
+/// <see cref="Provider"/> names the external sign-in provider (e.g. "google") when the user signed up that way — null for
+/// password users; <see cref="IsExternal"/> is the convenience flag used to hide the password-change UI.</summary>
+public record UserDto(Guid Id, string Username, string Email, string? Avatar = null, string? Provider = null)
+{
+    public bool IsExternal => !string.IsNullOrEmpty(Provider);
+}
 
 /// <summary>Set (or clear, with null) the signed-in user's profile picture. <see cref="DataUrl"/> is a small data-URL image.</summary>
 public record SetAvatarRequest(string? DataUrl);

@@ -151,6 +151,68 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         Changed?.Invoke();
     }
 
+    // --- Membership / archiving -------------------------------------------
+
+    /// <summary>The current account's other members (everyone but the signed-in user).</summary>
+    public IReadOnlyList<MemberDto> OtherMembers => RealUsers.Where(m => m.UserId != auth.UserId).ToList();
+
+    public Guid MyUserId => auth.UserId;
+
+    /// <summary>The current account's owner (from the server-authoritative summary).</summary>
+    public Guid CurrentOwnerId => _summaries.ElementAtOrDefault(_accountIndex)?.OwnerUserId ?? Guid.Empty;
+
+    /// <summary>Leave the current account. Returns whether it was archived (you were the last member) or just left.</summary>
+    public async Task<LeaveAccountResult> LeaveCurrentAccount(Guid? newOwnerUserId)
+    {
+        var id = CurrentAccountId;
+        var result = await api.LeaveAccountAsync(id, newOwnerUserId);
+        _cache.Remove(id);
+        var index = _summaries.FindIndex(a => a.Id == id);
+        if (index >= 0) _summaries.RemoveAt(index);   // dropped from the active list either way
+        if (_accountIndex >= _summaries.Count)
+            _accountIndex = Math.Max(0, _summaries.Count - 1);
+        await LoadSelectedAccountAsync();
+        Changed?.Invoke();
+        return result;
+    }
+
+    /// <summary>Owner removes another member from the current account.</summary>
+    public async Task RemoveMember(Guid memberUserId)
+    {
+        var id = CurrentAccountId;
+        await api.RemoveMemberAsync(id, memberUserId);
+        await ReloadSummariesKeepingAsync(id);
+        await LoadSelectedAccountAsync(forceRefresh: true);
+        Changed?.Invoke();
+    }
+
+    /// <summary>Owner hands ownership of the current account to another member.</summary>
+    public async Task TransferOwnership(Guid newOwnerUserId)
+    {
+        var id = CurrentAccountId;
+        await api.TransferOwnershipAsync(id, newOwnerUserId);
+        await ReloadSummariesKeepingAsync(id);
+        await LoadSelectedAccountAsync(forceRefresh: true);
+        Changed?.Invoke();
+    }
+
+    public Task<List<ArchivedAccountDto>> GetArchivedAccounts() => api.GetArchivedAccountsAsync();
+
+    public async Task ReactivateAccount(Guid accountId)
+    {
+        await api.ReactivateAccountAsync(accountId);
+        await ReloadSummariesKeepingAsync(accountId);
+        await LoadSelectedAccountAsync(forceRefresh: true);
+        Changed?.Invoke();
+    }
+
+    private async Task ReloadSummariesKeepingAsync(Guid accountId)
+    {
+        _summaries = await api.GetAccountsAsync();
+        var idx = _summaries.FindIndex(a => a.Id == accountId);
+        _accountIndex = idx >= 0 ? idx : Math.Max(0, Math.Min(_accountIndex, _summaries.Count - 1));
+    }
+
     private async Task LoadSelectedAccountAsync(bool forceRefresh = false)
     {
         if (_summaries.Count == 0) { _account = null; _version = 0; return; }
@@ -879,6 +941,37 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         Period.RemoveExternalTransfer(id);
         return SaveAsync();
     }
+
+    // --- Bank sync (Open Banking) -----------------------------------------
+    // The server stages raw bank transactions; the client turns a confirmed one into a real domain expense
+    // (the account body is client-owned) and then acks it so a later sync won't resurface it.
+
+    public Task<BankSyncStatusDto> GetBankStatus() => api.GetBankStatusAsync(CurrentAccountId);
+
+    public Task<List<BankInstitutionDto>> GetBankInstitutions(string country = "GB") =>
+        api.GetBankInstitutionsAsync(CurrentAccountId, country);
+
+    /// <summary>Begin linking: returns the bank's consent URL for the UI to navigate to.</summary>
+    public async Task<string> StartBankLink(string institutionName, string country)
+    {
+        var resp = await api.StartBankLinkAsync(CurrentAccountId, new StartBankLinkRequest(institutionName, country));
+        return resp.LinkUrl;
+    }
+
+    public Task SyncBank() => api.SyncBankAsync(CurrentAccountId);
+
+    public Task<List<PendingBankTransactionDto>> GetPendingBankTransactions() =>
+        api.GetPendingBankTransactionsAsync(CurrentAccountId);
+
+    /// <summary>Turn a staged bank transaction into an expense in the given category/fund, then mark it handled.</summary>
+    public async Task ConfirmBankTransaction(string externalId, Guid categoryId, decimal amount, Guid fundId, string? note, DateOnly date)
+    {
+        await AddExpense(categoryId, amount, fundId, note, date);
+        await api.AckBankTransactionAsync(CurrentAccountId, externalId, confirmed: true);
+    }
+
+    public Task DismissBankTransaction(string externalId) =>
+        api.AckBankTransactionAsync(CurrentAccountId, externalId, confirmed: false);
 
     public Task ReschedulePeriod(DateOnly from, DateOnly to)
     {

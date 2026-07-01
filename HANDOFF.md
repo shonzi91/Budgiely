@@ -1,6 +1,6 @@
 # Budgiely (FinApp) — session handoff
 
-Last updated: 2026-06-30 (Session 12b). Read this + [README.md](README.md) + recent `git log` to catch up.
+Last updated: 2026-07-01 (Session 14). Read this + [README.md](README.md) + recent `git log` to catch up.
 Product is now branded **TandemTab** ("Track together, save together.") — renamed from Budgiely in Session 11m.
 Logo = a mint **TT / two-figures-on-a-beam** monogram (`Components/TandemLogo.razor`, was `BudgieLogo`). **Code
 namespaces/assemblies stay `FinApp.*`** (product name ≠ assembly name — not worth a full rename). Live on Cloud Run, all
@@ -13,6 +13,124 @@ that reserves cash; `Free to allocate = Current − savings`; fund→fund transf
 sending money OUT of the account caps at the fund balance.* Settle-on-behalf, expenses calendar, and a per-account
 "savings configuration" roadmap item all landed/queued this session. Two EF migrations added (AddExpenseOnBehalfOfOtherAccount,
 AddExpenseSettlementLinks). Redeploy: `gcloud run deploy finapp --source . --region europe-west1`.
+
+## Session 14 (2026-07-01) — Next-steps batch: UI polish, account lifecycle, external-user UX. 135 tests.
+Six requested items. **135 tests** (90 domain + 6 persistence + 39 server).
+1. **Wordmark spacing** — `Tandem`/`Tab` were separate flex items so the `.brand` gap (8px) fell between them; wrapped the
+   word in `.brand-word` and zeroed `.brand-tab` margin (both `MainLayout` + `AuthPanel`). **Avatar↔greeting**: grouped into
+   `.appbar-id` (gap 2px) so the app-bar's 12px gap no longer separates them.
+2. **Dark calendar + labels** — added `html.dark` overrides for `.cal-*` (cells/out/today/sel/total) and fixed the
+   dark-on-dark checkbox labels (`.modal .check` had a hardcoded `#1f2430`) → `html.dark .modal .check`. Both app.css hosts;
+   web `?v=7`.
+3. **Period bar** — prev/next arrows now get `.nav-hidden` (`visibility:hidden`, space reserved) instead of a greyed
+   `disabled` when there's no prev/next, so the arrow disappears **and** the centered period bar doesn't shift.
+4. **Dark-theme toggle** — replaced the raw checkbox with a real switch (`.switch`/`.switch-track`/`.switch-thumb`, mint when
+   on) in the profile modal; dark off-track override in app.css.
+5. **Spending-trend math fix** — the trend was per-month-normalized AND its average **included the current month**, so it
+   reconciled with neither the raw "Spent" figure nor the score. `InsightsService.BuildTrend` now uses **raw
+   `ExpensesTotal`** and averages **prior periods only** (matches `TrailingAverageOutgoings`); dropped the `/mo` framing
+   ("Monthly outgoings"→"Outgoings"). Now `current − shownAverage = shownDelta`.
+6. **External-user profile UX** — new `ExternalIdentityService` (standalone `ExternalIdentities(UserId,Provider)` table, same
+   migration-free CREATE-IF-NOT-EXISTS pattern) records who signed up via Google/Facebook; the OAuth callback marks it, `/me`
+   returns it, `UserDto.Provider`/`IsExternal` added. Profile modal now hides "Change password" for external users (shows
+   "You sign in with Google …") and **dedupes** the `username · email` line when they're equal.
+
+**Account lifecycle (leave / transfer / archive) — items #2 and #3:**
+- **Domain** (`Account`): `RemoveMember` (blocks removing the owner while others remain), `TransferOwnership` (to an existing
+  member). Membership lives in the server-authoritative **relational Members table** (not the opaque snapshot), so these run
+  server-side and other members re-pull via the existing `AccountChanged` sync signal.
+- **Server**: `AccountService` gains `LeaveAsync` (sole member → **archive**; owner-with-others → requires `newOwnerUserId`,
+  transfers then removes; else just removes), `RemoveMemberAsync` (owner-only), `TransferOwnershipAsync`, `ReactivateAsync`,
+  `ListArchivedForUserAsync`; `ListForUserAsync` now **excludes archived**. New `ArchivedAccountsService` = standalone
+  `ArchivedAccounts(AccountId, ArchivedAt)` table (migration-free pattern), `RetentionDays = 30`; **`PurgeExpiredAsync` runs at
+  startup** and hard-deletes accounts past the window (cascades). Endpoints: `POST /accounts/{id}/leave`,
+  `DELETE /accounts/{id}/members/{userId}`, `POST /accounts/{id}/transfer-ownership`, `POST /accounts/{id}/reactivate`,
+  `GET /accounts/archived`. Contracts: `LeaveAccountRequest`, `TransferOwnershipRequest`, `LeaveAccountResult`, `ArchivedAccountDto`.
+- **UI**: People panel (Money tab) tags **you/owner**, shows a `×` remove per other member (owner only), and a **Leave account**
+  button → modal that (a) warns about 30-day archive when you're the sole member, (b) requires picking a new owner when you own
+  it and others remain, or (c) plain-confirms otherwise. **Archived accounts** section in the profile modal lists archived
+  accounts with days-left and a **Restore** button (`State.GetArchivedAccounts`/`ReactivateAccount`).
+- **Tests**: domain `UsersAndSharingTests` (+5: remove/owner-guard/sole-owner/transfer/transfer-guard); server
+  `MembershipApiTests` (archive-on-sole-leave, reactivate, non-owner leave, owner-leave-requires-successor, owner-removes-member,
+  non-owner-can't-remove). **`FinAppServerFactory` now blanks provider creds** (BankSync/Google/Facebook) so tests are hermetic
+  regardless of user-secrets. NOTE: user-secrets earlier held placeholder junk (`PASTE_APP_ID`, unexpanded `$(cat …)`) — removed.
+- **Files:** new `Server/Auth/ExternalIdentityService.cs`, `Server/Accounts/ArchivedAccountsService.cs`,
+  `tests/.../MembershipApiTests.cs`; edited `Domain/Accounts/Account.cs`, `Contracts/{Auth,Accounts}.cs`, `Server/Program.cs`,
+  `Server/Accounts/AccountService.cs`, `Shared.UI/Services/{FinAppApiClient,BudgetingState,InsightsService,Localizer}.cs`,
+  `Shared.UI/Pages/Dashboard.razor`(+`.css`), `Shared.UI/Layout/MainLayout.razor`(+`.css`), `Shared.UI/Components/AuthPanel.razor`(+`.css`),
+  both `wwwroot/css/app.css`, web `index.html`, `tests/.../{FinAppServerFactory,UsersAndSharingTests}.cs`.
+
+## Session 13 (2026-07-01) — Bank sync (Open Banking via Enable Banking). 124 tests. ⚠️ needs Enable Banking credentials to switch on.
+Scaffolded linking an account to **Revolut** (or any Enable Banking-supported bank) to auto-import transactions as
+expenses. **Inert until configured** (panel hidden, provider calls 503 when unconfigured) — safe in prod as-is.
+Same "inert-until-credentialed" pattern as the Google/Facebook OAuth work (Session 12m).
+- **Aggregator history:** first built against **GoCardless Bank Account Data** (formerly Nordigen), but **their new
+  signups are currently disabled**, so pivoted to **Enable Banking** (enablebanking.com) — self-serve signup, free sandbox +
+  free "restricted production" on your *own* accounts, supports Revolut. The provider was isolated by design, so only the
+  one client class + the consent semantics changed; DTOs/endpoints/staging tables/UI were untouched by the swap.
+- **Why an aggregator, not Revolut's own Open Banking API:** calling a bank's PSD2 API directly requires being a **regulated
+  AISP** (FCA/EU registration, eIDAS QWAC/QSEAL certs). Enable Banking *is* that regulated party. Regulatory catch
+  (unavoidable, any aggregator): **bank consent expires ~90 days** → user must re-approve.
+- **Enable Banking auth is unusual:** you register an application (upload a self-signed cert) to get an **application id**,
+  then sign a short-lived **RS256 JWT** per request with the matching **RSA private key** (`kid`=app id, `iss`=enablebanking.com,
+  `aud`=api.enablebanking.com). No token endpoint — the JWT is minted locally (`EnableBankingClient.BuildJwt`, uses the
+  `System.IdentityModel.Tokens.Jwt` package already pulled in by JwtBearer). Consent flow: `GET /aspsps?country=` → `POST /auth`
+  (returns a redirect URL; we pass `state`=accountId) → user consents at bank → callback with `?code=&state=` → `POST /sessions`
+  (exchange code → session id + account id) → `GET /accounts/{uid}/transactions?date_from=`.
+- **Server (`src/FinApp.Server/BankSync/`):**
+  - `EnableBankingClient.cs` — HTTP wrapper (JWT mint, aspsps, auth, sessions, transactions). `IsEnabled` gates on
+    `BankSync:EnableBanking:ApplicationId` + `PrivateKey` (PEM). Scoped (no shared state — JWT per call). Note Enable Banking
+    reports amounts **unsigned + a `credit_debit_indicator`**; the client makes debits negative to match our model, and
+    synthesizes a stable dedupe id when the bank omits a reference. **Transaction parsing tolerates two provider JSON
+    shapes** (`ParseTransactions`, pure + unit-tested): Berlin Group / NextGenPSD2 **camelCase** (signed
+    `transactionAmount.amount`, `bookingDate`, `transactionId`, rows nested under `transactions.booked`) AND Enable Banking's
+    snake_case native shape. Confirmed the real API is Berlin Group camelCase from a balance sample the user shared
+    (`balanceAmount`/`balanceType:"ITAV"` = interim-available) — the original snake_case-only parser would have silently
+    returned zero rows. Amount rule: apply `creditDebitIndicator` when present, else trust the sign on the amount.
+  - `BankSyncService.cs` — orchestration + storage. **Two standalone tables created idempotently with `CREATE TABLE IF NOT
+    EXISTS`** (`BankConnections`, `PendingBankTransactions`), exactly like `AvatarService` — **no EF migration**, because prod
+    Postgres builds its schema via `EnsureCreated()` which never ALTERs existing tables. Raw ADO so the SQL runs on SQLite +
+    Postgres. `EnsureSchemaAsync` is called at startup in Program.cs next to the avatar one. Columns are provider-neutral
+    (`ProviderRef` = session id, `AccountRef` = account uid).
+  - **Split of responsibility (important):** the server only **stages + dedupes** raw bank rows (dedupe key
+    `(AccountId, ExternalId)`) and records which the user already handled (`Status` Pending/Confirmed/Dismissed) so a later
+    sync — the provider returns the whole history window every time — won't resurface them. Turning a pending row into a real
+    `Expense` happens **client-side** (`BudgetingState.ConfirmBankTransaction` → existing `AddExpense`), because the account's
+    actual content lives in the client-owned **opaque snapshot blob**; the server never deserializes it.
+  - Endpoints under `/accounts/{id}/bank/*`: `status`, `institutions?country=GB`, `link` (POST → returns bank consent URL),
+    `sync` (POST, pulls ~90 days of booked transactions into staging), `pending` (GET), `ack` (POST confirm/dismiss). Plus a
+    **public** `GET /bank/callback?code=&state=<accountId>` (no auth — the code is exchanged with Enable Banking to prove
+    consent) that bounces to the SPA at `/?bank=linked|error`. Callback URL shares `Auth:PublicBaseUrl` (like the OAuth redirect).
+- **Client:** `FinAppApiClient` typed methods + `BudgetingState` bank region (`GetBankStatus`, `GetBankInstitutions`,
+  `StartBankLink(name,country)`, `SyncBank`, `GetPendingBankTransactions`, `ConfirmBankTransaction`, `DismissBankTransaction`).
+- **UI:** a **Bank sync panel in the Money tab** (`Dashboard.razor`, only rendered when `_bankStatus.Enabled`): Link
+  Revolut button → full-page hop to consent; once linked shows institution/last-synced + a Refresh (sync) button and a
+  **review list** of pending transactions (per-row category+fund pickers, Add-expense/Dismiss). Debits only offer
+  Add-expense (imported as `Math.Abs(amount)`); credits ("money in") can only be dismissed. `OnInitializedAsync` also
+  handles the `?bank=linked` return (lands on Money, runs an initial sync, clears the query). Consent-expired → Reconnect.
+- **Contracts:** `BankSync.cs` (`BankSyncStatusDto`, `BankInstitutionDto(Name,Country)`, `StartBankLinkRequest(InstitutionName,
+  Country)`/`Response`, `PendingBankTransactionDto`, `BankTransactionAck`). BG strings for visible labels (generated text stays EN).
+- **Tests:** `BankSyncApiTests` (disabled-when-unconfigured, empty-pending, sync-without-link→400, contributor scoping)
+  + `BankTransactionParsingTests` (both provider JSON shapes, signed vs indicator amounts, synthetic-id dedupe, empty).
+  **124 tests** (85 domain + 6 persistence + 33 server).
+- **⚠️ TO TURN ON:** sign up at enablebanking.com, create an application, generate an RSA keypair + upload the cert to get the
+  **Application ID**, and register the redirect URL (`https://tandemtab.com/bank/callback` for prod, `http://localhost:5179/bank/callback`
+  for local). **Local dev:** user-secrets is now enabled on the server (`UserSecretsId` in the csproj) — set
+  `dotnet user-secrets set "BankSync:EnableBanking:ApplicationId" "<id>"` and `... "BankSync:EnableBanking:PrivateKey" "<PEM>"`.
+  **Prod (Cloud Run):** store the PEM in Secret Manager (like `finapp-jwt`) →
+  `--update-secrets=BankSync__EnableBanking__PrivateKey=finapp-enablebanking-key:latest`
+  `--update-env-vars=BankSync__EnableBanking__ApplicationId=<id>`. `Auth__PublicBaseUrl=https://tandemtab.com` already set.
+  Untested end-to-end (no credentials here). **Sandbox testing toggle (built in):** set
+  `BankSync:EnableBanking:SandboxAspsp` to Enable Banking's mock bank name (e.g. `"Mock ASPSP"` — check what `GET /aspsps`
+  returns in sandbox) and optionally `BankSync:EnableBanking:SandboxCountry`. When set, `SearchInstitutionsAsync` swaps the
+  Revolut-name filter for that name (and country) so the UI's auto-pick lands on the mock bank and you can drive the whole
+  consent→transactions flow with fake data. Leave it unset for the real Revolut flow.
+- **Files:** new `Server/BankSync/{EnableBankingClient,BankSyncService}.cs`, `Contracts/BankSync.cs`,
+  `tests/.../BankSyncApiTests.cs`; edited `Server/Program.cs` (+`FinApp.Server.csproj` UserSecretsId),
+  `Shared.UI/Services/{FinAppApiClient,BudgetingState,Localizer}.cs`, `Shared.UI/Pages/Dashboard.razor`(+`.css`).
+- **Possible follow-ups:** background/scheduled sync (v1 is pull-on-demand + on `?bank=linked`); merchant→category
+  auto-suggest (v1 defaults every row to the first category); multi-bank beyond Revolut (institution search filters to
+  Revolut by name — widen it); dark-theme touch-ups for the bank panel; localize generated text.
 
 ## Session 12 (2026-06-29) — Insights / financial-health tab (NEW roadmap item #2). UI-only, NO domain change. 106 tests.
 New **5th tab "Insights"** on the Dashboard — a read-only financial-health report for the **currently-viewed period**

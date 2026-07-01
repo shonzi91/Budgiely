@@ -74,6 +74,70 @@ public class UsersAndSharingTests
         Assert.False(account.IsContributor(Guid.Empty));
     }
 
+    [Fact]
+    public void Remove_member_drops_a_contributor()
+    {
+        var account = NewAccount();
+        var owner = Guid.NewGuid();
+        var invitee = Guid.NewGuid();
+        account.AssignOwner(owner, "Owner");
+        account.AddContributor(invitee, "Invitee");
+
+        account.RemoveMember(invitee);
+
+        Assert.False(account.IsContributor(invitee));
+        Assert.Single(account.Members);
+    }
+
+    [Fact]
+    public void Owner_cannot_be_removed_while_others_remain()
+    {
+        var account = NewAccount();
+        var owner = Guid.NewGuid();
+        account.AssignOwner(owner, "Owner");
+        account.AddContributor(Guid.NewGuid(), "Invitee");
+
+        Assert.Throws<InvalidOperationException>(() => account.RemoveMember(owner));
+    }
+
+    [Fact]
+    public void Sole_owner_can_be_removed()
+    {
+        var account = NewAccount();
+        var owner = Guid.NewGuid();
+        account.AssignOwner(owner, "Owner");
+
+        account.RemoveMember(owner);
+
+        Assert.Empty(account.Members);
+    }
+
+    [Fact]
+    public void Transfer_ownership_moves_owner_to_another_member()
+    {
+        var account = NewAccount();
+        var owner = Guid.NewGuid();
+        var invitee = Guid.NewGuid();
+        account.AssignOwner(owner, "Owner");
+        account.AddContributor(invitee, "Invitee");
+
+        account.TransferOwnership(invitee);
+
+        Assert.True(account.IsOwner(invitee));
+        Assert.False(account.IsOwner(owner));
+        // After transfer the previous owner is an ordinary member and can now leave.
+        account.RemoveMember(owner);
+        Assert.False(account.IsContributor(owner));
+    }
+
+    [Fact]
+    public void Cannot_transfer_ownership_to_a_non_member()
+    {
+        var account = NewAccount();
+        account.AssignOwner(Guid.NewGuid(), "Owner");
+        Assert.Throws<InvalidOperationException>(() => account.TransferOwnership(Guid.NewGuid()));
+    }
+
     // --- Invitation state machine -----------------------------------------
 
     [Fact]

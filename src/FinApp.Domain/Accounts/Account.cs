@@ -110,6 +110,24 @@ public sealed class Account : Entity
     /// <summary>Add an invited user as a contributor. Contributors are unified with members.</summary>
     public AccountMember AddContributor(Guid userId, string displayName) => AddMember(userId, displayName);
 
+    /// <summary>Remove a member. The owner can't be removed while other members remain — transfer ownership first.</summary>
+    public void RemoveMember(Guid userId)
+    {
+        var member = _members.FirstOrDefault(m => m.UserId == userId)
+            ?? throw new InvalidOperationException("That user isn't a member of this account.");
+        if (IsOwner(userId) && _members.Count > 1)
+            throw new InvalidOperationException("Transfer ownership before the owner leaves the account.");
+        _members.Remove(member);
+    }
+
+    /// <summary>Hand ownership to another existing member (e.g. before the current owner leaves).</summary>
+    public void TransferOwnership(Guid toUserId)
+    {
+        if (!_members.Any(m => m.UserId == toUserId))
+            throw new InvalidOperationException("The new owner must already be a member of the account.");
+        OwnerUserId = toUserId;
+    }
+
     /// <summary>True for the account creator — gates rename/delete of the account itself.</summary>
     public bool IsOwner(Guid userId) => userId != Guid.Empty && OwnerUserId == userId;
 

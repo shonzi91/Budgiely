@@ -49,6 +49,23 @@ public sealed class FinAppApiClient(HttpClient http)
     public Task DeleteAccountAsync(Guid id, CancellationToken ct = default) =>
         SendAsync(HttpMethod.Delete, $"/accounts/{id}", null, ct);
 
+    // --- Membership / archiving -------------------------------------------
+    public async Task<LeaveAccountResult> LeaveAccountAsync(Guid id, Guid? newOwnerUserId, CancellationToken ct = default)
+    {
+        var res = await SendAsync<LeaveResultDto>(HttpMethod.Post, $"/accounts/{id}/leave", new LeaveAccountRequest(newOwnerUserId), ct);
+        return Enum.TryParse<LeaveAccountResult>(res.Result, out var r) ? r : LeaveAccountResult.Left;
+    }
+    public Task RemoveMemberAsync(Guid id, Guid memberUserId, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Delete, $"/accounts/{id}/members/{memberUserId}", null, ct);
+    public Task TransferOwnershipAsync(Guid id, Guid newOwnerUserId, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Post, $"/accounts/{id}/transfer-ownership", new TransferOwnershipRequest(newOwnerUserId), ct);
+    public Task<List<ArchivedAccountDto>> GetArchivedAccountsAsync(CancellationToken ct = default) =>
+        SendAsync<List<ArchivedAccountDto>>(HttpMethod.Get, "/accounts/archived", null, ct);
+    public Task ReactivateAccountAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Post, $"/accounts/{id}/reactivate", null, ct);
+
+    private record LeaveResultDto(string Result);
+
     // --- Snapshot ---------------------------------------------------------
     public Task<AccountSnapshot> GetSnapshotAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<AccountSnapshot>(HttpMethod.Get, $"/accounts/{id}/snapshot", null, ct);
@@ -66,6 +83,20 @@ public sealed class FinAppApiClient(HttpClient http)
             ?? "account.xlsx";
         return (bytes, fileName);
     }
+
+    // --- Bank sync (Open Banking) -----------------------------------------
+    public Task<BankSyncStatusDto> GetBankStatusAsync(Guid accountId, CancellationToken ct = default) =>
+        SendAsync<BankSyncStatusDto>(HttpMethod.Get, $"/accounts/{accountId}/bank/status", null, ct);
+    public Task<List<BankInstitutionDto>> GetBankInstitutionsAsync(Guid accountId, string country, CancellationToken ct = default) =>
+        SendAsync<List<BankInstitutionDto>>(HttpMethod.Get, $"/accounts/{accountId}/bank/institutions?country={Uri.EscapeDataString(country)}", null, ct);
+    public Task<StartBankLinkResponse> StartBankLinkAsync(Guid accountId, StartBankLinkRequest req, CancellationToken ct = default) =>
+        SendAsync<StartBankLinkResponse>(HttpMethod.Post, $"/accounts/{accountId}/bank/link", req, ct);
+    public Task SyncBankAsync(Guid accountId, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Post, $"/accounts/{accountId}/bank/sync", null, ct);
+    public Task<List<PendingBankTransactionDto>> GetPendingBankTransactionsAsync(Guid accountId, CancellationToken ct = default) =>
+        SendAsync<List<PendingBankTransactionDto>>(HttpMethod.Get, $"/accounts/{accountId}/bank/pending", null, ct);
+    public Task AckBankTransactionAsync(Guid accountId, string externalId, bool confirmed, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Post, $"/accounts/{accountId}/bank/ack", new BankTransactionAck(externalId, confirmed), ct);
 
     // --- Invitations ------------------------------------------------------
     public Task<List<InvitationDto>> GetPendingInvitationsAsync(CancellationToken ct = default) =>

@@ -18,6 +18,14 @@ public sealed class FinAppServerFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:FinApp", $"Data Source={_dbPath}");
+        // Keep tests hermetic: never inherit a developer's real provider credentials from user-secrets/env,
+        // so "feature is off when unconfigured" assertions hold regardless of the machine running them.
+        builder.UseSetting("BankSync:EnableBanking:ApplicationId", "");
+        builder.UseSetting("BankSync:EnableBanking:PrivateKey", "");
+        builder.UseSetting("Auth:Google:ClientId", "");
+        builder.UseSetting("Auth:Google:ClientSecret", "");
+        builder.UseSetting("Auth:Facebook:AppId", "");
+        builder.UseSetting("Auth:Facebook:AppSecret", "");
     }
 
     /// <summary>Register a new user and return a client with its bearer token attached.</summary>

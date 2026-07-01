@@ -168,3 +168,20 @@ html.dark .warn-text { color: #f0a85a; }
 
 /* Settings (gear) toggle row */
 html.dark .pm-theme-row { color: #e8eaf0; }
+html.dark .switch-track { background: #3a4256; }   /* off-state track; .switch.on stays mint */
+
+/* Checkbox labels (e.g. "On behalf of another account") — scoped rule set dark-on-dark text */
+html.dark .modal .check { color: #e8eaf0; }
+
+/* Expenses month calendar */
+html.dark .cal-dow span { color: #8891a3; }
+html.dark .cal-cell { background: #181c25; border-color: #262d3d; }
+html.dark .cal-cell:hover:not(.cal-out) { background: #1e2937; border-color: #2f5f4a; }
+html.dark .cal-num { color: #e8eaf0; }
+html.dark .cal-cell.cal-out { background: #12151d; border-color: #1c2130; }
+html.dark .cal-cell.cal-out .cal-num { color: #4b5364; }
+html.dark .cal-cell.cal-today { border-color: #2bbd86; }
+html.dark .cal-cell.cal-today .cal-num { color: #2bbd86; }
+html.dark .cal-cell.cal-sel { background: #14352a; border-color: #2bbd86; }
+html.dark .cal-total { color: #6fe0b4; background: #14352a; }
+html.dark .cal-add:hover { background: #14352a; }

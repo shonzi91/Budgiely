@@ -280,6 +280,8 @@ button.ghost:disabled { background: #f1f3f6; color: #aab; cursor: not-allowed; }
 }
 .nav:hover:not(:disabled) { background: #e4f6ee; border-color: #13a06e; }
 .nav:disabled { background: #fff; color: #d3d6df; border-color: #f0f1f4; cursor: not-allowed; }
+/* No prev/next: hide the arrow but keep its space so the period bar stays put. */
+.nav.nav-hidden { visibility: hidden; }
 
 .panel-head { display: flex; justify-content: space-between; align-items: center; }
 .panel-head h2 { margin: 0; }
@@ -692,6 +694,25 @@ input[type=date]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgrou
 /* Setup tab — People row */
 .people-row { display: flex; flex-wrap: wrap; gap: 14px 18px; }
 .person { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; }
+.person-tag { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #13a06e; background: #e4f6ee; border-radius: 999px; padding: 1px 7px; }
+.person-x { border: none; background: none; color: #c0392b; font-size: 1.05rem; line-height: 1; cursor: pointer; padding: 0 2px; opacity: .7; }
+.person-x:hover { opacity: 1; }
+.people-actions { margin-top: 12px; }
+.link.danger { color: #c0392b; }
+
+/* Setup tab — Bank sync */
+.bank-conn { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin: 0 0 8px; font-size: .92rem; }
+.bank-pending { margin-top: 6px; }
+.bank-tx { display: block; padding: 10px 0; border-top: 1px solid #eef0f3; }
+.bank-tx-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.bank-tx-desc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bank-tx .amt.credit { color: #0e9e6d; }
+.bank-tx-meta { color: #9ca3af; font-size: .82rem; margin-top: 2px; }
+.bank-tx-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.bank-tx-form select { flex: 1 1 140px; min-width: 0; }
+.bank-tx-actions { display: flex; gap: 8px; margin-top: 8px; }
+.bank-panel button.primary { padding: 8px 14px; border: none; border-radius: 8px; background: #13a06e; color: #fff; font-weight: 600; cursor: pointer; }
+.bank-panel button.primary:disabled { background: #c7c9d6; cursor: not-allowed; }
 
 /* Spending tab — budget section header */
 .spending-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }

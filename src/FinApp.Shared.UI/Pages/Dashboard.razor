@@ -3,6 +3,7 @@
 @inject BudgetingState State
 @inject Localizer Loc
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 @if (_busy)
 {
@@ -74,7 +75,7 @@ else
                 </span>
             </div>
             <div class="period-nav">
-                <button class="nav" title="@Loc["Previous period"]" @onclick="State.GoPrev" disabled="@(!State.CanGoPrev)">‹</button>
+                <button class="nav @(State.CanGoPrev ? "" : "nav-hidden")" title="@Loc["Previous period"]" @onclick="State.GoPrev" disabled="@(!State.CanGoPrev)">‹</button>
                 <div class="period-row">
                     <button class="period period-btn" title="@Loc["Edit period dates"]" @onclick="OpenEditPeriod">@State.Period.From.ToString("dd MMM") – @State.Period.To.ToString("dd MMM yyyy")</button>
                     <span class="period-ops">
@@ -88,7 +89,7 @@ else
                         }
                     </span>
                 </div>
-                <button class="nav" title="@Loc["Next period"]" @onclick="State.GoNext" disabled="@(!State.CanGoNext)">›</button>
+                <button class="nav @(State.CanGoNext ? "" : "nav-hidden")" title="@Loc["Next period"]" @onclick="State.GoNext" disabled="@(!State.CanGoNext)">›</button>
             </div>
         </div>
         <div class="head-right">
@@ -290,14 +291,14 @@ else
                         <h2 class="insight-h">@Loc["Spending trend"]</h2>
                         <section class="panel trend-card">
                             <div class="trend-head">
-                                <span>@Loc["Monthly outgoings"] · @Loc["avg"] @Fmt(ov.TrendAverage)</span>
+                                <span>@Loc["Outgoings"] · @Loc["avg"] @Fmt(ov.TrendAverage)</span>
                                 <span class="trend-dir @(ov.TrendUp ? "up" : "down")">@(ov.TrendUp ? "↑" : "↓") @(ov.TrendUp ? Loc["above average"] : Loc["below average"])</span>
                             </div>
                             <div class="trend-plot">
                                 <div class="trend-avg" style="bottom:@((Math.Clamp((double)ov.TrendAvgFraction, 0, 1) * 72).ToString(System.Globalization.CultureInfo.InvariantCulture))px"></div>
                                 @foreach (var t in ov.Trend)
                                 {
-                                    <div class="trend-bar @(t.IsCurrent ? "current" : "")" style="height:@(Math.Max(3.0, (double)t.BarFraction * 72).ToString(System.Globalization.CultureInfo.InvariantCulture))px" title="@t.Label: @Fmt(t.Outgoings)/mo"></div>
+                                    <div class="trend-bar @(t.IsCurrent ? "current" : "")" style="height:@(Math.Max(3.0, (double)t.BarFraction * 72).ToString(System.Globalization.CultureInfo.InvariantCulture))px" title="@t.Label: @Fmt(t.Outgoings)"></div>
                                 }
                             </div>
                             <div class="trend-labels">
@@ -321,10 +322,113 @@ else
                 <div class="people-row">
                     @foreach (var m in State.RealUsers)
                     {
-                        <span class="person"><Avatar Name="@m.DisplayName" Picture="@State.MemberAvatar(m.UserId)" Size="26" /> @m.DisplayName</span>
+                        var mid = m.UserId;
+                        <span class="person">
+                            <Avatar Name="@m.DisplayName" Picture="@State.MemberAvatar(mid)" Size="26" /> @m.DisplayName
+                            @if (mid == State.MyUserId) { <span class="person-tag">@Loc["you"]</span> }
+                            else if (mid == State.CurrentOwnerId) { <span class="person-tag">@Loc["owner"]</span> }
+                            @if (State.IsOwnerOfCurrent && mid != State.MyUserId)
+                            {
+                                <button class="person-x" title="@Loc["Remove from account"]" @onclick="() => OpenRemoveMember(mid, m.DisplayName)">×</button>
+                            }
+                        </span>
                     }
                 </div>
+                <div class="people-actions">
+                    <button class="link danger" @onclick="OpenLeaveAccount">🚪 @Loc["Leave account"]</button>
+                </div>
             </section>
+
+            @if (_bankStatus?.Enabled == true)
+            {
+                <section class="panel bank-panel">
+                    <div class="panel-head">
+                        <h2>@Loc["Bank sync"]</h2>
+                        @if (_bankStatus.Connected && State.IsPeriodOpen)
+                        {
+                            <button class="link" title="@Loc["Fetch new transactions"]" @onclick="SyncBankAsync" disabled="@_bankBusy">🔄 @Loc["Refresh"]</button>
+                        }
+                    </div>
+
+                    @if (!_bankStatus.Connected)
+                    {
+                        <p class="hint">@Loc["Link your Revolut account to pull transactions in automatically."]</p>
+                        <button class="primary" @onclick="LinkBankAsync" disabled="@_bankBusy">🔗 @Loc["Link Revolut"]</button>
+                    }
+                    else
+                    {
+                        <p class="bank-conn">
+                            <span>✅ @_bankStatus.InstitutionName</span>
+                            @if (_bankStatus.LastSyncedAt is { } synced)
+                            {
+                                <span class="row-note">· @Loc["last synced"] @synced.LocalDateTime.ToString("dd MMM HH:mm")</span>
+                            }
+                        </p>
+                        @if (_bankStatus.ConsentExpiresAt is { } exp && exp <= DateTimeOffset.UtcNow)
+                        {
+                            <div class="alert warn-bg">
+                                <span>@Loc["Your bank consent has expired (banks require re-approval every 90 days)."]</span>
+                                <button class="link" @onclick="LinkBankAsync" disabled="@_bankBusy">@Loc["Reconnect"]</button>
+                            </div>
+                        }
+
+                        @if (!State.IsPeriodOpen)
+                        {
+                            <p class="hint">@Loc["Reopen the period to import transactions."]</p>
+                        }
+                        else if (_bankPending.Count == 0)
+                        {
+                            <p class="hint">@Loc["No transactions waiting. Hit Refresh to check for new ones."]</p>
+                        }
+                        else
+                        {
+                            <p class="hint">@Loc["Review each transaction, pick a category and fund, then add it as an expense."]</p>
+                            <ul class="list bank-pending">
+                                @foreach (var t in _bankPending)
+                                {
+                                    var tx = t;
+                                    var isDebit = tx.Amount < 0;
+                                    <li class="bank-tx">
+                                        <div class="bank-tx-head">
+                                            <span class="bank-tx-desc">@tx.Description</span>
+                                            <span class="amt @(isDebit ? "" : "credit")">@Fmt(new Money(Math.Abs(tx.Amount), State.Currency))</span>
+                                        </div>
+                                        <div class="bank-tx-meta">@tx.Date.ToString("dd MMM yyyy")@(isDebit ? "" : $" · {Loc["money in"]}")</div>
+                                        @if (isDebit)
+                                        {
+                                            <div class="bank-tx-form">
+                                                <select @bind="_bankCat">
+                                                    @foreach (var (cat, depth) in State.CategoryOptions)
+                                                    {
+                                                        <option value="@cat.Id">@CatOption(cat.Id, cat.Name, depth)</option>
+                                                    }
+                                                </select>
+                                                <select @bind="_bankFund">
+                                                    @foreach (var f in State.RootFunds)
+                                                    {
+                                                        <option value="@f.Id">@f.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                        }
+                                        <div class="bank-tx-actions">
+                                            @if (isDebit)
+                                            {
+                                                <button class="primary" @onclick="() => ConfirmBankRow(tx)" disabled="@_bankBusy">@Loc["Add expense"]</button>
+                                            }
+                                            <button class="ghost" @onclick="() => DismissBankRow(tx)" disabled="@_bankBusy">@Loc["Dismiss"]</button>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
+                    @if (_bankError is not null)
+                    {
+                        <div class="alert warn-bg"><span>@_bankError</span><button class="alert-x" title="@Loc["Dismiss"]" @onclick="() => _bankError = null">×</button></div>
+                    }
+                </section>
+            }
 
             @if (State.Deficit.Amount > 0)
             {
@@ -919,6 +1023,47 @@ else
                     </div>
                     break;
 
+                case Modal.RemoveMember:
+                    <h3>@Loc["Remove"] @_removeMemberName?</h3>
+                    <p class="hint">@string.Format(Loc["{0} will lose access to this account. Their recorded contributions and expenses stay."], _removeMemberName)</p>
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="Back">@Loc["Cancel"]</button>
+                        <button class="danger-btn" @onclick="ConfirmRemoveMember">@Loc["Remove from account"]</button>
+                    </div>
+                    break;
+
+                case Modal.LeaveAccount:
+                    <h3>@Loc["Leave"] @State.Account.Name?</h3>
+                    @if (State.RealUsers.Count <= 1)
+                    {
+                        <p class="hint">@Loc["You're the only person here, so the account will be archived for 30 days. You can restore it from your profile before then; after that it's deleted."]</p>
+                    }
+                    else if (State.CurrentOwnerId == State.MyUserId)
+                    {
+                        <p class="hint">@Loc["You own this account, so hand it to another member before you go."]</p>
+                        <label>@Loc["New owner"]
+                            <select @bind="_leaveNewOwnerId">
+                                <option value="@Guid.Empty">@Loc["Choose a member…"]</option>
+                                @foreach (var m in State.OtherMembers)
+                                {
+                                    <option value="@m.UserId">@m.DisplayName</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                    else
+                    {
+                        <p class="hint">@Loc["You'll lose access to this account. Your recorded contributions and expenses stay for the others."]</p>
+                    }
+                    <div class="modal-actions">
+                        <button class="ghost" @onclick="Back">@Loc["Cancel"]</button>
+                        <button class="danger-btn" @onclick="ConfirmLeaveAccount"
+                                disabled="@(State.RealUsers.Count > 1 && State.CurrentOwnerId == State.MyUserId && _leaveNewOwnerId == Guid.Empty)">
+                            @(State.RealUsers.Count <= 1 ? Loc["Archive account"] : Loc["Leave account"])
+                        </button>
+                    </div>
+                    break;
+
                 case Modal.Invite:
                     <h3>@Loc["Invite to"] @State.Account.Name</h3>
                     <p class="hint">@Loc["Enter the username of an existing FinApp user. They'll get a prompt to accept; once they do, they can edit everything except deleting the account."]</p>
@@ -1510,7 +1655,7 @@ else
 }
 
 @code {
-    private enum Modal { None, AddCat, EditCat, DeleteCat, CategoryDetail, AddAccount, EditAccount, DeleteAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, SettleExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, Transfer, Deposit, EditDeposit, DeleteDeposit, ManageContribCats, ContribCat, DeleteContribCat, AddSaving, BudgetSaving, SpendSaving, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
+    private enum Modal { None, AddCat, EditCat, DeleteCat, CategoryDetail, AddAccount, EditAccount, DeleteAccount, RemoveMember, LeaveAccount, AddExpense, NextPeriod, RemovePeriod, EditExpense, DeleteExpense, SettleExpense, AddBucket, EditBucket, DeleteBucket, AddFund, EditFund, DeleteFund, Invite, Transfer, Deposit, EditDeposit, DeleteDeposit, ManageContribCats, ContribCat, DeleteContribCat, AddSaving, BudgetSaving, SpendSaving, EditSavingDeposit, DeleteSavingDeposit, EditTransfer, DeleteTransfer, EditPeriod, EditSavingMovement, DeleteSavingMovement, DeleteExternalTransfer }
     private enum Tab { Overview, Account, Budgets, Savings }
 
     private Tab _tab = Tab.Overview;
@@ -1528,6 +1673,13 @@ else
     private Guid _fundId;
     private string? _note;
     private bool _onBehalfOther;   // mark a new expense as settle-able onto another account (feature 1)
+
+    // Bank sync (Open Banking) — panel in the Money tab. Null status = feature off / unreachable (panel hidden).
+    private BankSyncStatusDto? _bankStatus;
+    private List<PendingBankTransactionDto> _bankPending = [];
+    private Guid _bankCat, _bankFund;   // shared pickers for the row being reviewed (one at a time)
+    private bool _bankBusy;
+    private string? _bankError;
     private DateOnly _expenseDate = DateOnly.FromDateTime(DateTime.Today);
     private DateOnly? _dayView;   // when set, the Expenses tab focuses a single day
     private bool _calendar;       // Expenses tab: month-grid view instead of the list
@@ -1612,6 +1764,9 @@ else
     private decimal _initialSavings;
 
     private string? _inviteUsername;
+    private Guid _removeMemberId;
+    private string? _removeMemberName;
+    private Guid _leaveNewOwnerId;
     private string? _inviteMessage;
 
     // Per-fund real opening balances entered on "Start next month".
@@ -1671,6 +1826,103 @@ else
         // On phones, open the Expenses tab first so adding an expense is one tap away.
         try { if (await JS.InvokeAsync<int>("finappViewportWidth") is > 0 and <= 720) ShowExpensesTab(); }
         catch { /* host without the helper (e.g. MAUI) — stay on Account */ }
+
+        await LoadBankAsync();
+        await HandleBankReturnAsync();
+    }
+
+    // --- Bank sync (Open Banking) ----------------------------------------
+    /// <summary>Fetch the account's bank-sync status and any staged transactions (silent if the feature is off).</summary>
+    private async Task LoadBankAsync()
+    {
+        if (!State.HasAccounts) return;
+        try
+        {
+            _bankStatus = await State.GetBankStatus();
+            _bankPending = _bankStatus.Connected ? await State.GetPendingBankTransactions() : [];
+            DefaultBankPickers();
+        }
+        catch { _bankStatus = null; } // unreachable/unconfigured — hide the panel entirely
+    }
+
+    /// <summary>After returning from the bank's consent page (/?bank=linked|error), land on Money and pull in transactions.</summary>
+    private async Task HandleBankReturnAsync()
+    {
+        var query = new Uri(Nav.Uri).Query;
+        if (!query.Contains("bank=", StringComparison.Ordinal)) return;
+        _tab = Tab.Account;
+        if (query.Contains("bank=linked", StringComparison.Ordinal))
+        {
+            await LoadBankAsync();
+            if (_bankStatus?.Connected == true) await SyncBankAsync();
+        }
+        else
+        {
+            _bankError = Loc["Couldn’t link your bank. Please try again."];
+        }
+        Nav.NavigateTo(Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0] is { Length: > 0 } p ? p : "/", replace: true);
+    }
+
+    private void DefaultBankPickers()
+    {
+        _bankCat = State.CategoryOptions.FirstOrDefault().Category?.Id ?? Guid.Empty;
+        _bankFund = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
+    }
+
+    private async Task LinkBankAsync()
+    {
+        _bankBusy = true; _bankError = null;
+        try
+        {
+            var banks = await State.GetBankInstitutions();
+            if (banks.FirstOrDefault() is not { } revolut)
+            {
+                _bankError = Loc["No Revolut connection is available for your country yet."];
+                return;
+            }
+            var url = await State.StartBankLink(revolut.Name, revolut.Country);
+            await JS.InvokeVoidAsync("finappNavigate", url);   // full-page hop to the bank's consent page
+        }
+        catch (Exception ex) { _bankError = ex.Message; }
+        finally { _bankBusy = false; }
+    }
+
+    private async Task SyncBankAsync()
+    {
+        _bankBusy = true; _bankError = null;
+        try
+        {
+            await State.SyncBank();
+            _bankPending = await State.GetPendingBankTransactions();
+            DefaultBankPickers();
+        }
+        catch (Exception ex) { _bankError = ex.Message; }
+        finally { _bankBusy = false; }
+    }
+
+    private async Task ConfirmBankRow(PendingBankTransactionDto tx)
+    {
+        if (_bankCat == Guid.Empty || _bankFund == Guid.Empty) { _bankError = Loc["Pick a category and fund first."]; return; }
+        _bankBusy = true; _bankError = null;
+        try
+        {
+            await State.ConfirmBankTransaction(tx.ExternalId, _bankCat, Math.Abs(tx.Amount), _bankFund, tx.Description, ClampToPeriod(tx.Date));
+            _bankPending.RemoveAll(p => p.ExternalId == tx.ExternalId);
+        }
+        catch (Exception ex) { _bankError = ex.Message; }
+        finally { _bankBusy = false; }
+    }
+
+    private async Task DismissBankRow(PendingBankTransactionDto tx)
+    {
+        _bankBusy = true; _bankError = null;
+        try
+        {
+            await State.DismissBankTransaction(tx.ExternalId);
+            _bankPending.RemoveAll(p => p.ExternalId == tx.ExternalId);
+        }
+        catch (Exception ex) { _bankError = ex.Message; }
+        finally { _bankBusy = false; }
     }
 
     /// <summary>Open the Spending tab focused on today's expenses (clamped into the current period).</summary>
@@ -2432,6 +2684,24 @@ else
     private Task ConfirmDeleteAccount() => RunModal(async () =>
     {
         await State.RemoveAccount(State.CurrentAccountId);
+        CloseModal();
+    });
+
+    // --- Membership: leave / remove / transfer ----------------------------
+    private void OpenRemoveMember(Guid memberId, string name) { _removeMemberId = memberId; _removeMemberName = name; _modal = Modal.RemoveMember; }
+
+    private Task ConfirmRemoveMember() => RunModal(async () =>
+    {
+        await State.RemoveMember(_removeMemberId);
+        CloseModal();
+    });
+
+    private void OpenLeaveAccount() { _leaveNewOwnerId = Guid.Empty; _modal = Modal.LeaveAccount; }
+
+    private Task ConfirmLeaveAccount() => RunModal(async () =>
+    {
+        var newOwner = _leaveNewOwnerId == Guid.Empty ? (Guid?)null : _leaveNewOwnerId;
+        await State.LeaveCurrentAccount(newOwner);
         CloseModal();
     });
 

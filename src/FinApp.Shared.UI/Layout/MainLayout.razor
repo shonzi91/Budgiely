@@ -10,20 +10,22 @@
     @if (Auth.IsAuthenticated)
     {
         <header class="app-bar">
-            <span class="brand"><span class="brand-logo"><TandemLogo /></span> Tandem<span class="brand-tab">Tab</span></span>
+            <span class="brand"><span class="brand-logo"><TandemLogo /></span><span class="brand-word">Tandem<span class="brand-tab">Tab</span></span></span>
             <span class="appbar-user">
                 <LanguagePicker />
-                <button class="avatar" title="@Loc["Profile settings"]" @onclick="OpenProfile">
-                    @if (Auth.CurrentUser?.Avatar is { } pic)
-                    {
-                        <img src="@pic" alt="" />
-                    }
-                    else
-                    {
-                        <span>@Initial</span>
-                    }
-                </button>
-                <button class="user" title="@Loc["Profile settings"]" @onclick="OpenProfile">@Loc["Hello,"] @Auth.CurrentUser!.Username</button>
+                <span class="appbar-id">
+                    <button class="avatar" title="@Loc["Profile settings"]" @onclick="OpenProfile">
+                        @if (Auth.CurrentUser?.Avatar is { } pic)
+                        {
+                            <img src="@pic" alt="" />
+                        }
+                        else
+                        {
+                            <span>@Initial</span>
+                        }
+                    </button>
+                    <button class="user" title="@Loc["Profile settings"]" @onclick="OpenProfile">@Loc["Hello,"] @Auth.CurrentUser!.Username</button>
+                </span>
                 <button class="link" @onclick="SignOut">@Loc["Sign out"]</button>
             </span>
         </header>
@@ -48,11 +50,14 @@
         <div class="pm-backdrop">
             <div class="pm">
                 <h3>@Loc["Profile settings"]</h3>
-                <p class="pm-who">@Auth.CurrentUser!.Username · @Auth.CurrentUser!.Email</p>
+                <p class="pm-who">@Auth.CurrentUser!.Username@(SameUsernameAndEmail ? "" : $" · {Auth.CurrentUser!.Email}")</p>
                 <h4>@Loc["Appearance"]</h4>
                 <label class="pm-theme-row">
                     <span>@Loc["Dark theme"]</span>
-                    <input type="checkbox" checked="@_dark" @onchange="ToggleTheme" />
+                    <span class="switch @(_dark ? "on" : "")">
+                        <input type="checkbox" checked="@_dark" @onchange="ToggleTheme" />
+                        <span class="switch-track"><span class="switch-thumb"></span></span>
+                    </span>
                 </label>
                 <h4>@Loc["Profile picture"]</h4>
                 <div class="pm-avatar-row">
@@ -76,21 +81,47 @@
                 {
                     <div class="pm-msg pm-error">@_avatarError</div>
                 }
-                <h4>@Loc["Change password"]</h4>
-                @if (_pwdError is not null)
+                @if (Auth.CurrentUser!.IsExternal)
                 {
-                    <div class="pm-msg pm-error">@_pwdError</div>
+                    <h4>@Loc["Sign-in"]</h4>
+                    <p class="pm-hint">@string.Format(Loc["You sign in with {0} — there's no password to manage."], ProviderName)</p>
                 }
-                @if (_pwdOk)
+                else
                 {
-                    <div class="pm-msg pm-ok">@Loc["Password changed."]</div>
+                    <h4>@Loc["Change password"]</h4>
+                    @if (_pwdError is not null)
+                    {
+                        <div class="pm-msg pm-error">@_pwdError</div>
+                    }
+                    @if (_pwdOk)
+                    {
+                        <div class="pm-msg pm-ok">@Loc["Password changed."]</div>
+                    }
+                    <label>@Loc["Current password"] <input type="password" @bind="_curPwd" /></label>
+                    <label>@Loc["New password"] <input type="password" @bind="_newPwd" /></label>
+                    <label>@Loc["Confirm new password"] <input type="password" @bind="_confirmPwd" /></label>
                 }
-                <label>@Loc["Current password"] <input type="password" @bind="_curPwd" /></label>
-                <label>@Loc["New password"] <input type="password" @bind="_newPwd" /></label>
-                <label>@Loc["Confirm new password"] <input type="password" @bind="_confirmPwd" /></label>
+                @if (_archived.Count > 0)
+                {
+                    <h4>@Loc["Archived accounts"]</h4>
+                    <p class="pm-hint">@Loc["Archived accounts are deleted after 30 days. Restore one to bring it back."]</p>
+                    <ul class="pm-archived">
+                        @foreach (var a in _archived)
+                        {
+                            var aid = a.Id;
+                            <li>
+                                <span class="pm-arch-name">@a.Name <span class="pm-hint">· @DaysLeft(a.PurgeAt)</span></span>
+                                <button class="ghost" @onclick="() => Reactivate(aid)" disabled="@_archiveBusy">@Loc["Restore"]</button>
+                            </li>
+                        }
+                    </ul>
+                }
                 <div class="pm-actions">
                     <button class="ghost" @onclick="CloseProfile">@Loc["Close"]</button>
-                    <button @onclick="ChangePassword" disabled="@(_pwdBusy || _curPwd.Length == 0 || _newPwd.Length < 8)">@Loc["Change password"]</button>
+                    @if (!Auth.CurrentUser!.IsExternal)
+                    {
+                        <button @onclick="ChangePassword" disabled="@(_pwdBusy || _curPwd.Length == 0 || _newPwd.Length < 8)">@Loc["Change password"]</button>
+                    }
                 </div>
             </div>
         </div>
@@ -104,12 +135,43 @@
     private string? _avatarError;
     private string Initial => (Auth.CurrentUser?.Username ?? "?").Trim() is { Length: > 0 } u ? u[..1].ToUpperInvariant() : "?";
 
-    private bool _profileOpen, _pwdBusy, _pwdOk;
+    // Hide the redundant email when it's identical to the username (common for external sign-ups).
+    private bool SameUsernameAndEmail =>
+        string.Equals(Auth.CurrentUser?.Username, Auth.CurrentUser?.Email, StringComparison.OrdinalIgnoreCase);
+    // "google" -> "Google" for the sign-in note.
+    private string ProviderName => Auth.CurrentUser?.Provider is { Length: > 0 } p ? char.ToUpperInvariant(p[0]) + p[1..] : "";
+
+    private bool _profileOpen, _pwdBusy, _pwdOk, _archiveBusy;
     private string _curPwd = "", _newPwd = "", _confirmPwd = "";
     private string? _pwdError;
+    private List<ArchivedAccountDto> _archived = [];
 
-    private void OpenProfile() { _profileOpen = true; _curPwd = _newPwd = _confirmPwd = ""; _pwdError = null; _pwdOk = false; }
+    private async Task OpenProfile()
+    {
+        _profileOpen = true; _curPwd = _newPwd = _confirmPwd = ""; _pwdError = null; _pwdOk = false;
+        try { _archived = await State.GetArchivedAccounts(); } catch { _archived = []; }
+        StateHasChanged();
+    }
     private void CloseProfile() => _profileOpen = false;
+
+    private async Task Reactivate(Guid accountId)
+    {
+        _archiveBusy = true;
+        try
+        {
+            await State.ReactivateAccount(accountId);
+            _archived = _archived.Where(a => a.Id != accountId).ToList();
+        }
+        catch { /* surfaced elsewhere */ }
+        finally { _archiveBusy = false; }
+    }
+
+    /// <summary>"5 days left" style copy for the purge deadline.</summary>
+    private string DaysLeft(DateTimeOffset purgeAt)
+    {
+        var days = Math.Max(0, (int)Math.Ceiling((purgeAt - DateTimeOffset.UtcNow).TotalDays));
+        return string.Format(Loc["{0} days left"], days);
+    }
 
     private async Task ChangePassword()
     {

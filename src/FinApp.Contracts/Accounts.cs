@@ -18,6 +18,19 @@ public record AccountSummaryDto(
 public record CreateAccountRequest(string Name, string Currency);
 public record RenameAccountRequest(string Name);
 
+/// <summary>Leave an account. When the leaver is the owner and others remain, <see cref="NewOwnerUserId"/> must
+/// name the member who takes over. Ignored when the caller is the sole member (the account is archived).</summary>
+public record LeaveAccountRequest(Guid? NewOwnerUserId = null);
+
+/// <summary>Hand ownership of an account to another current member.</summary>
+public record TransferOwnershipRequest(Guid NewOwnerUserId);
+
+/// <summary>Outcome of a leave: the caller left a shared account, or (as sole member) it was archived.</summary>
+public enum LeaveAccountResult { Left, Archived }
+
+/// <summary>An archived (soft-deleted) account the caller can still restore until <see cref="PurgeAt"/>.</summary>
+public record ArchivedAccountDto(Guid Id, string Name, string Currency, DateTimeOffset ArchivedAt, DateTimeOffset PurgeAt);
+
 /// <summary>
 /// Opaque-friendly full snapshot of a domain account aggregate, exchanged when a contributor loads or
 /// saves a shared account. <see cref="Payload"/> is the serialized aggregate; keeping it a single blob

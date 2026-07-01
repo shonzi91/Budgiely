@@ -47,7 +47,7 @@
 .auth-brand { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .brand-tab {
     background: #fff; color: #13a06e; border: 1px solid #d6f0e3;
-    border-radius: 9px; padding: 0 8px; margin-left: 2px;
+    border-radius: 9px; padding: 0 8px; margin-left: 0;
 }
 .auth-logo {
     width: 64px; height: 64px; flex: 0 0 auto;

@@ -278,45 +278,41 @@ public sealed class InsightsService
         return change > 0.05m ? DeltaDir.Up : change < -0.05m ? DeltaDir.Down : DeltaDir.Flat;
     }
 
-    // --- Outgoings trend (per-month-normalized so uneven period lengths compare fairly) ---------
-
-    private const decimal DaysPerMonth = 30.44m;
-
-    /// <summary>The period's spend scaled to a whole month (so a 10-day or 45-day period reads as €/month).</summary>
-    private static decimal MonthlySpend(Period p)
-    {
-        var days = Math.Max(1, p.LengthInDays + 1);
-        return p.ExpensesTotal.Amount / days * DaysPerMonth;
-    }
+    // --- Outgoings trend --------------------------------------------------------------------------
+    // Uses each period's actual outgoings (so the current bar matches the "Spent" figure shown elsewhere),
+    // and compares the current period against the average of the PRIOR periods only — an average that
+    // included the current period couldn't be meaningfully "above" or "below". This mirrors how the score's
+    // spending-trend component computes its trailing average (see TrailingAverageOutgoings).
 
     private (IReadOnlyList<TrendPoint> Points, Money Average, decimal AvgFraction, bool Up, string Note)
         BuildTrend(IReadOnlyList<Period> periods, int idx, string currency, Func<Money, string> fmt)
     {
         var start = Math.Max(0, idx - 5);
-        var monthly = new List<(string Label, decimal M, bool Cur)>();
+        var series = new List<(string Label, decimal Amt, bool Cur)>();
         for (var i = start; i <= idx; i++)
-            monthly.Add((periods[i].From.ToString("MMM", CultureInfo.InvariantCulture),
-                decimal.Round(MonthlySpend(periods[i]), 2), i == idx));
+            series.Add((periods[i].From.ToString("MMM", CultureInfo.InvariantCulture),
+                decimal.Round(periods[i].ExpensesTotal.Amount, 2), i == idx));
 
-        var max = monthly.Count > 0 ? monthly.Max(x => x.M) : 0m;
-        var avg = monthly.Count > 0 ? monthly.Average(x => x.M) : 0m;
+        var max = series.Count > 0 ? series.Max(x => x.Amt) : 0m;
+        var priorCount = series.Count - 1;   // periods before the current one, in the window
+        var avg = priorCount > 0 ? series.Take(priorCount).Average(x => x.Amt) : 0m;
         var avgMoney = new Money(decimal.Round(avg, 2), currency);
 
-        var points = monthly.Select(x => new TrendPoint(
-            x.Label, new Money(x.M, currency), max > 0m ? x.M / max : 0m, x.Cur)).ToList();
+        var points = series.Select(x => new TrendPoint(
+            x.Label, new Money(x.Amt, currency), max > 0m ? x.Amt / max : 0m, x.Cur)).ToList();
         var avgFraction = max > 0m ? avg / max : 0m;
 
-        // Trend reads the latest month against the rolling average of the window.
-        var diff = monthly.Count > 0 ? monthly[^1].M - avg : 0m;
+        var current = series.Count > 0 ? series[^1].Amt : 0m;
+        var diff = current - avg;
         bool up; string note;
-        if (monthly.Count < 2)
+        if (priorCount < 1)
             (up, note) = (false, _t("Not enough history yet to spot a trend."));
         else if (Math.Abs(diff) < 1m)
-            (up, note) = (false, string.Format(_t("This month is right around your {0}-month average of {1}/mo."), monthly.Count, fmt(avgMoney)));
+            (up, note) = (false, string.Format(_t("This month is right around your {0}-month average of {1}."), priorCount, fmt(avgMoney)));
         else if (diff > 0m)
-            (up, note) = (true, string.Format(_t("This month is {0} above your {1}-month average of {2}/mo."), fmt(new Money(decimal.Round(diff, 2), currency)), monthly.Count, fmt(avgMoney)));
+            (up, note) = (true, string.Format(_t("This month is {0} above your {1}-month average of {2}."), fmt(new Money(decimal.Round(diff, 2), currency)), priorCount, fmt(avgMoney)));
         else
-            (up, note) = (false, string.Format(_t("This month is {0} below your {1}-month average of {2}/mo."), fmt(new Money(decimal.Round(-diff, 2), currency)), monthly.Count, fmt(avgMoney)));
+            (up, note) = (false, string.Format(_t("This month is {0} below your {1}-month average of {2}."), fmt(new Money(decimal.Round(-diff, 2), currency)), priorCount, fmt(avgMoney)));
 
         return (points, avgMoney, avgFraction, up, note);
     }

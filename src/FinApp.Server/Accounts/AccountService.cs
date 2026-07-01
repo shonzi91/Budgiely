@@ -11,7 +11,7 @@ namespace FinApp.Server.Accounts;
 /// are a contributor of (owned or joined). Rename/delete are owner-only; everything else inside an account
 /// is editable by any contributor (enforced by the per-resource endpoints/snapshots).
 /// </summary>
-public sealed class AccountService(FinAppDbContext db)
+public sealed class AccountService(FinAppDbContext db, ArchivedAccountsService archives)
 {
     public async Task<List<AccountSummaryDto>> ListForUserAsync(Guid userId, CancellationToken ct = default)
     {
@@ -20,7 +20,76 @@ public sealed class AccountService(FinAppDbContext db)
             .Where(a => a.Members.Any(m => m.UserId == userId))
             .ToListAsync(ct);
 
-        return accounts.Select(a => ToSummary(a, userId)).ToList();
+        var archived = await archives.ArchivedIdsAsync(ct);
+        return accounts.Where(a => !archived.Contains(a.Id)).Select(a => ToSummary(a, userId)).ToList();
+    }
+
+    /// <summary>Archived accounts the user is (still) a member of, with when each was archived + the purge deadline.</summary>
+    public async Task<List<ArchivedAccountDto>> ListArchivedForUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        var accounts = await db.Accounts
+            .Include(a => a.Members)
+            .Where(a => a.Members.Any(m => m.UserId == userId))
+            .ToListAsync(ct);
+
+        var archivedAt = await archives.ArchivedAtAsync(ct);
+        return accounts
+            .Where(a => archivedAt.ContainsKey(a.Id))
+            .Select(a => new ArchivedAccountDto(a.Id, a.Name, a.Currency, archivedAt[a.Id],
+                archivedAt[a.Id].AddDays(ArchivedAccountsService.RetentionDays)))
+            .ToList();
+    }
+
+    /// <summary>Leave an account. If the caller is the sole member the account is archived (soft-deleted for a
+    /// grace period); if they own it and others remain, ownership must first pass to <paramref name="newOwnerUserId"/>.</summary>
+    public async Task<LeaveAccountResult> LeaveAsync(Guid userId, Guid accountId, Guid? newOwnerUserId, CancellationToken ct = default)
+    {
+        var account = await LoadContributorAsync(userId, accountId, ct);
+
+        if (account.Members.Count == 1)
+        {
+            await archives.ArchiveAsync(accountId, ct);
+            return LeaveAccountResult.Archived;
+        }
+
+        if (account.IsOwner(userId))
+        {
+            if (newOwnerUserId is not { } newOwner || newOwner == userId)
+                throw new BadRequestException("Choose who should take over the account before you leave.");
+            try { account.TransferOwnership(newOwner); }
+            catch (InvalidOperationException ex) { throw new BadRequestException(ex.Message); }
+        }
+
+        account.RemoveMember(userId);
+        await db.SaveChangesAsync(ct);
+        return LeaveAccountResult.Left;
+    }
+
+    /// <summary>Owner removes another member from the account.</summary>
+    public async Task RemoveMemberAsync(Guid ownerUserId, Guid accountId, Guid targetUserId, CancellationToken ct = default)
+    {
+        var account = await LoadOwnedAsync(ownerUserId, accountId, ct);
+        if (targetUserId == ownerUserId)
+            throw new BadRequestException("Use “leave account” to remove yourself.");
+        try { account.RemoveMember(targetUserId); }
+        catch (InvalidOperationException ex) { throw new BadRequestException(ex.Message); }
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Owner hands ownership to another member (without leaving).</summary>
+    public async Task TransferOwnershipAsync(Guid ownerUserId, Guid accountId, Guid newOwnerUserId, CancellationToken ct = default)
+    {
+        var account = await LoadOwnedAsync(ownerUserId, accountId, ct);
+        try { account.TransferOwnership(newOwnerUserId); }
+        catch (InvalidOperationException ex) { throw new BadRequestException(ex.Message); }
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Restore an archived account (within the grace window) back to the active list.</summary>
+    public async Task ReactivateAsync(Guid userId, Guid accountId, CancellationToken ct = default)
+    {
+        await LoadContributorAsync(userId, accountId, ct);   // must still be a member
+        await archives.UnarchiveAsync(accountId, ct);
     }
 
     public async Task<AccountSummaryDto> CreateAsync(Guid userId, string displayName, CreateAccountRequest request, CancellationToken ct = default)
@@ -60,6 +129,15 @@ public sealed class AccountService(FinAppDbContext db)
         var account = await LoadOwnedAsync(userId, accountId, ct);
         db.Accounts.Remove(account);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Load an account the user is a member of, or 404.</summary>
+    private async Task<Account> LoadContributorAsync(Guid userId, Guid accountId, CancellationToken ct)
+    {
+        var account = await db.Accounts.Include(a => a.Members).FirstOrDefaultAsync(a => a.Id == accountId, ct);
+        if (account is null || !account.IsContributor(userId))
+            throw new NotFoundException("Account not found.");
+        return account;
     }
 
     /// <summary>Load an account the user can see, or 404; throw 403 unless they own it (rename/delete gate).</summary>
