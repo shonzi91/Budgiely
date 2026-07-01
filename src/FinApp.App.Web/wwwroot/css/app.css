@@ -177,6 +177,8 @@ html.dark .warn-text { color: #f0a85a; }
 /* Settings (gear) toggle row */
 html.dark .pm-theme-row { color: #e8eaf0; }
 html.dark .switch-track { background: #3a4256; }   /* off-state track; .switch.on stays mint */
+html.dark .app-legal { background: #0f1117; border-top-color: #262d3d; }
+html.dark .app-legal a { color: #aab0c0; }
 
 /* Checkbox labels (e.g. "On behalf of another account") — scoped rule set dark-on-dark text */
 html.dark .modal .check { color: #e8eaf0; }

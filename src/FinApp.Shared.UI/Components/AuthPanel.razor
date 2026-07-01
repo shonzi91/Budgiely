@@ -54,6 +54,12 @@
             <button class="auth-provider" @onclick='() => External("facebook")'><span class="auth-provider-ico">f</span> @Loc["Continue with Facebook"]</button>
         }
     }
+
+    <div class="auth-legal">
+        <a href="@PrivacyUrl" target="_blank" rel="noopener">@Loc["Privacy"]</a>
+        <span>·</span>
+        <a href="@TermsUrl" target="_blank" rel="noopener">@Loc["Terms"]</a>
+    </div>
 </div>
 
 @code {
@@ -66,6 +72,10 @@
 
     private bool CanRegister =>
         !string.IsNullOrWhiteSpace(_username) && !string.IsNullOrWhiteSpace(_email) && _password.Length >= 8;
+
+    // Static legal pages live in wwwroot; serve the Bulgarian variant when the UI is in Bulgarian.
+    private string PrivacyUrl => Loc.Culture == "bg" ? "/privacy.bg.html" : "/privacy.html";
+    private string TermsUrl => Loc.Culture == "bg" ? "/terms.bg.html" : "/terms.html";
 
     protected override async Task OnInitializedAsync()
     {

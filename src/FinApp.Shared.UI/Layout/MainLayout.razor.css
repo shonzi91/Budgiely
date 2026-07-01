@@ -139,3 +139,18 @@
     flex: 1 1 auto;
     overflow-y: auto;
 }
+
+.app-legal {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 12px;
+    font-size: .78rem;
+    color: #9ca3af;
+    background: #f6f7f9;
+    border-top: 1px solid #eceef2;
+}
+.app-legal a { color: #6b7280; text-decoration: none; }
+.app-legal a:hover { color: #13a06e; text-decoration: underline; }

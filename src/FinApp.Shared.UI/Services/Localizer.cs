@@ -130,6 +130,8 @@ public sealed class Localizer(IJSRuntime js)
         ["This month's budgets"] = "Бюджети за месеца",
         ["People"] = "Хора",
         ["Invite"] = "Покани",
+        ["Privacy"] = "Поверителност",
+        ["Terms"] = "Условия",
         ["you"] = "вие",
         ["owner"] = "собственик",
         ["Remove from account"] = "Премахни от акаунта",

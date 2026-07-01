@@ -1,3 +1,7 @@
+.auth-legal { margin-top: 18px; text-align: center; font-size: .8rem; color: #9ca3af; display: flex; gap: 8px; justify-content: center; }
+.auth-legal a { color: #6b7280; text-decoration: none; }
+.auth-legal a:hover { color: #13a06e; text-decoration: underline; }
+
 .auth {
     max-width: 384px;
     margin: 9vh auto 0;

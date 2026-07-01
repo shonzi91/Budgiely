@@ -93,3 +93,6 @@ edits persist immediately and survive restarts.
 5. Notifications (local reminders + push)
 6. Blazor WebAssembly / PWA client
 7. Phone targets (Android/iOS) on the MAUI host
+8. **Require accepting the Terms + Privacy Policy at registration** (record consent + version/timestamp
+   server-side; block sign-up until the box is ticked). Pages live at `/terms.html` + `/privacy.html`
+   (EN + `*.bg.html`); a link already sits in the sign-in and app footers.

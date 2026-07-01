@@ -45,6 +45,15 @@
         }
     </main>
 
+    @if (_restored)
+    {
+        <footer class="app-legal">
+            <a href="@PrivacyUrl" target="_blank" rel="noopener">@Loc["Privacy"]</a>
+            <span>·</span>
+            <a href="@TermsUrl" target="_blank" rel="noopener">@Loc["Terms"]</a>
+        </footer>
+    }
+
     @if (_profileOpen)
     {
         <div class="pm-backdrop">
@@ -140,6 +149,10 @@
         string.Equals(Auth.CurrentUser?.Username, Auth.CurrentUser?.Email, StringComparison.OrdinalIgnoreCase);
     // "google" -> "Google" for the sign-in note.
     private string ProviderName => Auth.CurrentUser?.Provider is { Length: > 0 } p ? char.ToUpperInvariant(p[0]) + p[1..] : "";
+
+    // Static legal pages in wwwroot; serve the Bulgarian variant when the UI is in Bulgarian.
+    private string PrivacyUrl => Loc.Culture == "bg" ? "/privacy.bg.html" : "/privacy.html";
+    private string TermsUrl => Loc.Culture == "bg" ? "/terms.bg.html" : "/terms.html";
 
     private bool _profileOpen, _pwdBusy, _pwdOk, _archiveBusy;
     private string _curPwd = "", _newPwd = "", _confirmPwd = "";
