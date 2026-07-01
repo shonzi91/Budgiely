@@ -705,15 +705,24 @@ input[type=date]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgrou
 .bank-disconnect { margin-left: auto; }
 .bank-pending { margin-top: 6px; }
 .bank-tx { display: block; padding: 10px 0; border-top: 1px solid #eef0f3; }
-.bank-tx-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.bank-tx-desc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bank-tx-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.bank-tx-desc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bank-tx .amt { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bank-tx .amt.credit { color: #0e9e6d; }
-.bank-tx-meta { color: #9ca3af; font-size: .82rem; margin-top: 2px; }
-.bank-tx-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.bank-tx-form select { flex: 1 1 140px; min-width: 0; }
-.bank-tx-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.map-chip { border: none; background: #eef6f2; color: #0e7a54; border-radius: 999px; padding: 1px 8px; font-size: .72rem; font-weight: 600; cursor: pointer; margin-left: 6px; }
-.map-chip:hover { background: #dcefe6; }
+/* Controls row: date · pickers (grow) · icon actions (fixed, right-aligned) */
+.bank-tx-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.bank-tx-date { flex: 0 0 auto; color: #9ca3af; font-size: .8rem; width: 48px; }
+.bank-tx-row .bank-sel { flex: 1 1 0; min-width: 0; }
+.bank-tx-icons { flex: 0 0 auto; display: inline-flex; gap: 6px; margin-left: auto; }
+.icon-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e3e6ec; background: #fff; cursor: pointer; font-size: .95rem; line-height: 1; display: inline-grid; place-items: center; padding: 0; }
+.icon-btn:hover { border-color: #cfd4dd; }
+.icon-btn:disabled { opacity: .5; cursor: not-allowed; }
+.icon-btn.ok { color: #0e9e6d; border-color: #b7e6d2; background: #f1fbf6; }
+.icon-btn.ok:hover { background: #e2f6ec; }
+.icon-btn.x { color: #9ca3af; }
+.icon-btn.x:hover { color: #c0392b; border-color: #f0c9c4; }
+.icon-btn.pin { filter: grayscale(1); opacity: .55; }
+.icon-btn.pin.on { filter: none; opacity: 1; border-color: #b7e6d2; background: #f1fbf6; }
 .bank-panel button.primary { padding: 8px 14px; border: none; border-radius: 8px; background: #13a06e; color: #fff; font-weight: 600; cursor: pointer; }
 .bank-panel button.primary:disabled { background: #c7c9d6; cursor: not-allowed; }
 

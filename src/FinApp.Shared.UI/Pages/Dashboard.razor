@@ -835,38 +835,34 @@ else
                                     var id = tx.ExternalId;
                                     var isDebit = tx.Amount < 0;
                                     var mappedLabel = MappedLabel(tx.Description);
+                                    var pinTitle = mappedLabel is not null
+                                        ? string.Format(Loc["Auto-fills {0} — click to forget"], mappedLabel)
+                                        : Loc["Always use this pick for this merchant"];
                                     <li class="bank-tx">
-                                        <div class="bank-tx-head">
-                                            <span class="bank-tx-desc">@tx.Description
-                                                @if (mappedLabel is not null)
-                                                {
-                                                    <button class="map-chip" title="@Loc["Stop auto-filling this merchant"]" @onclick="() => ForgetMapping(tx)" disabled="@_bankBusy">🔖 @mappedLabel ✕</button>
-                                                }
-                                            </span>
-                                            <span class="amt @(isDebit ? "" : "credit")">@Fmt(new Money(Math.Abs(tx.Amount), State.Currency))</span>
+                                        <div class="bank-tx-top">
+                                            <span class="bank-tx-desc" title="@tx.Description">@tx.Description</span>
+                                            <span class="amt @(isDebit ? "" : "credit")">@(isDebit ? "−" : "+")@Fmt(new Money(Math.Abs(tx.Amount), State.Currency))</span>
                                         </div>
-                                        <div class="bank-tx-meta">@tx.Date.ToString("dd MMM yyyy")@(isDebit ? "" : $" · {Loc["money in"]}")</div>
-                                        @if (isDebit)
-                                        {
-                                            <div class="bank-tx-form">
-                                                <select value="@RowCat(id)" @onchange="e => _bankRowCat[id] = Guid.Parse(e.Value?.ToString() ?? Guid.Empty.ToString())">
+                                        <div class="bank-tx-row">
+                                            <span class="bank-tx-date">@tx.Date.ToString("dd MMM")</span>
+                                            @if (isDebit)
+                                            {
+                                                <select class="bank-sel" value="@RowCat(id)" @onchange="e => _bankRowCat[id] = Guid.Parse(e.Value?.ToString() ?? Guid.Empty.ToString())">
                                                     @foreach (var (cat, depth) in State.CategoryOptions)
                                                     {
                                                         <option value="@cat.Id">@CatOption(cat.Id, cat.Name, depth)</option>
                                                     }
                                                 </select>
-                                                <select value="@RowFund(id)" @onchange="e => _bankRowFund[id] = Guid.Parse(e.Value?.ToString() ?? Guid.Empty.ToString())">
+                                                <select class="bank-sel" value="@RowFund(id)" @onchange="e => _bankRowFund[id] = Guid.Parse(e.Value?.ToString() ?? Guid.Empty.ToString())">
                                                     @foreach (var f in State.RootFunds)
                                                     {
                                                         <option value="@f.Id">@f.Name</option>
                                                     }
                                                 </select>
-                                            </div>
-                                        }
-                                        else
-                                        {
-                                            <div class="bank-tx-form">
-                                                <select value="@RowCredit(id)" @onchange="e => _bankRowCredit[id] = e.Value?.ToString() ?? string.Empty">
+                                            }
+                                            else
+                                            {
+                                                <select class="bank-sel" value="@RowCredit(id)" @onchange="e => _bankRowCredit[id] = e.Value?.ToString() ?? string.Empty">
                                                     <option value="">@Loc["Map to… (optional)"]</option>
                                                     <optgroup label="@Loc["Funds"]">
                                                         @foreach (var f in State.RootFunds)
@@ -881,15 +877,15 @@ else
                                                         }
                                                     </optgroup>
                                                 </select>
-                                            </div>
-                                        }
-                                        <div class="bank-tx-actions">
-                                            @if (isDebit)
-                                            {
-                                                <button class="primary" @onclick="() => ConfirmBankRow(tx)" disabled="@_bankBusy">@Loc["Add expense"]</button>
                                             }
-                                            <button class="ghost" title="@Loc["Always use this for this merchant"]" @onclick="() => RememberMapping(tx)" disabled="@_bankBusy">🔖 @Loc["Remember"]</button>
-                                            <button class="ghost" @onclick="() => DismissBankRow(tx)" disabled="@_bankBusy">@Loc["Dismiss"]</button>
+                                            <span class="bank-tx-icons">
+                                                <button class="icon-btn pin @(mappedLabel is not null ? "on" : "")" title="@pinTitle" @onclick="() => TogglePin(tx)" disabled="@_bankBusy">📌</button>
+                                                @if (isDebit)
+                                                {
+                                                    <button class="icon-btn ok" title="@Loc["Add expense"]" @onclick="() => ConfirmBankRow(tx)" disabled="@_bankBusy">✓</button>
+                                                }
+                                                <button class="icon-btn x" title="@Loc["Dismiss"]" @onclick="() => DismissBankRow(tx)" disabled="@_bankBusy">✕</button>
+                                            </span>
                                         </div>
                                     </li>
                                 }
@@ -1909,9 +1905,9 @@ else
         await LoadBankAsync();
     }
 
-    /// <summary>Staged transactions whose date falls in the period currently being viewed (feature 2.4).</summary>
+    /// <summary>Staged transactions in the viewed period (feature 2.4), skipping €0 / informational entries.</summary>
     private List<PendingBankTransactionDto> BankRowsForPeriod() =>
-        _bankPending.Where(t => t.Date >= State.Period.From && t.Date <= State.Period.To).ToList();
+        _bankPending.Where(t => t.Amount != 0 && t.Date >= State.Period.From && t.Date <= State.Period.To).ToList();
 
     /// <summary>After returning from the bank's consent page (/?bank=linked|error), land on the Bank tab and pull transactions.</summary>
     private async Task HandleBankReturnAsync()
@@ -2045,6 +2041,10 @@ else
         catch (Exception ex) { _bankError = ex.Message; }
         finally { _bankBusy = false; }
     }
+
+    /// <summary>One toggle for the merchant rule: save the current pick, or clear an existing rule.</summary>
+    private Task TogglePin(PendingBankTransactionDto tx) =>
+        MappingFor(tx.Description) is null ? RememberMapping(tx) : ForgetMapping(tx);
 
     private async Task ForgetMapping(PendingBankTransactionDto tx)
     {
