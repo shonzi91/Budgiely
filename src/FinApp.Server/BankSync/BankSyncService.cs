@@ -55,7 +55,11 @@ public sealed class BankSyncService(FinAppDbContext db, EnableBankingClient eb, 
         // replaces the Revolut-name filter (and optionally the country) so the UI's auto-pick lands on it.
         var sandbox = config["BankSync:EnableBanking:SandboxAspsp"];
         var usingSandbox = !string.IsNullOrWhiteSpace(sandbox);
-        var country = usingSandbox ? (config["BankSync:EnableBanking:SandboxCountry"] ?? countryCode) : countryCode;
+        // In production, BankSync:EnableBanking:Country selects which country's bank list to search (Revolut is
+        // listed per-country, e.g. GB for the UK, LT/DE/… for the EEA). Falls back to the caller's country.
+        var country = usingSandbox
+            ? (config["BankSync:EnableBanking:SandboxCountry"] ?? countryCode)
+            : (config["BankSync:EnableBanking:Country"] ?? countryCode);
         var filter = usingSandbox ? sandbox! : "revolut";
 
         var all = await eb.GetAspspsAsync(country, ct);
