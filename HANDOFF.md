@@ -69,6 +69,15 @@ carve-out are unchanged. Dark override updated (no more solid bar bg; `.inline-a
   visible while scrolling" matters again, the real fix is a single-row sticky header via a `ModalTitle()`/`PrimarySubmit()`
   dispatch (deferred — big switch over ~30 modals).
 
+## Session 12p (2026-06-30) — OAuth base switched to the custom domain tandemtab.com.
+`tandemtab.com` is already a Cloud Run domain mapping (DNS → Google 216.239.x anycast, serves the app). Set
+`Auth__PublicBaseUrl=https://tandemtab.com` (finapp-00055), so the Google redirect_uri is now
+`https://tandemtab.com/auth/external/google/callback` — **register THAT in the Google console** (Authorized redirect URIs).
+**Cloud-portability:** the redirect URI is config-driven (`Auth:PublicBaseUrl`) + Host-aware (`UseForwardedHeaders` incl.
+XForwardedHost), so it's not tied to Cloud Run. Migrating clouds = run the container elsewhere, repoint tandemtab.com DNS,
+carry the same secrets (DB conn, `finapp-jwt`, `finapp-google-client-secret`) — **no Google console change, no code change**
+(the callback is the domain, not the cloud host). The `UserAvatars` table auto-creates on startup on any provider.
+
 ## Session 12o (2026-06-30) — Google login WIRED UP in prod (Facebook still off).
 Configured Google OAuth on Cloud Run (revision finapp-00053+): client secret stored in **Secret Manager
 `finapp-google-client-secret`** (runtime SA `85638328674-compute@...` granted `secretAccessor`), then
