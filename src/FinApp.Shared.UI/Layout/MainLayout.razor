@@ -10,7 +10,7 @@
     @if (Auth.IsAuthenticated)
     {
         <header class="app-bar">
-            <span class="brand"><span class="brand-logo"><TandemLogo /></span> TandemTab</span>
+            <span class="brand"><span class="brand-logo"><TandemLogo /></span> Tandem<span class="brand-tab">Tab</span></span>
             <span class="appbar-user">
                 <LanguagePicker />
                 <button class="avatar" title="@Loc["Profile settings"]" @onclick="OpenProfile">
@@ -31,7 +31,7 @@
     <main class="app-body">
         @if (!_restored)
         {
-            <p class="loading">@Loc["Loading…"]</p>
+            <div class="loading"><Spinner Block="true" Text="@Loc["Loading…"]" /></div>
         }
         else if (!Auth.IsAuthenticated)
         {

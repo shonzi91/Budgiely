@@ -52,8 +52,8 @@ public sealed class ExternalAuthService(IHttpClientFactory httpFactory, IConfigu
         };
     }
 
-    /// <summary>Exchange the auth code for a token and fetch the user's email + name.</summary>
-    public async Task<(string Email, string? Name)> CompleteAsync(string provider, string code, string redirectUri, CancellationToken ct)
+    /// <summary>Exchange the auth code for a token and fetch the user's email, name and picture URL.</summary>
+    public async Task<(string Email, string? Name, string? Picture)> CompleteAsync(string provider, string code, string redirectUri, CancellationToken ct)
     {
         var http = httpFactory.CreateClient();
         var accessToken = await ExchangeCodeAsync(http, provider, code, redirectUri, ct);
@@ -83,11 +83,11 @@ public sealed class ExternalAuthService(IHttpClientFactory httpFactory, IConfigu
             : throw new BadRequestException("No access token returned.");
     }
 
-    private static async Task<(string Email, string? Name)> FetchUserAsync(HttpClient http, string provider, string accessToken, CancellationToken ct)
+    private static async Task<(string Email, string? Name, string? Picture)> FetchUserAsync(HttpClient http, string provider, string accessToken, CancellationToken ct)
     {
         var userInfoUrl = provider == "google"
             ? "https://openidconnect.googleapis.com/v1/userinfo"
-            : "https://graph.facebook.com/me?fields=name,email";
+            : "https://graph.facebook.com/me?fields=name,email,picture.width(256)";
 
         using var req = new HttpRequestMessage(HttpMethod.Get, userInfoUrl);
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -101,6 +101,16 @@ public sealed class ExternalAuthService(IHttpClientFactory httpFactory, IConfigu
         var name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
         if (string.IsNullOrWhiteSpace(email))
             throw new BadRequestException("The provider didn't share an email address.");
-        return (email!, name);
+
+        // Google returns a flat "picture" URL; Facebook nests it under picture.data.url.
+        string? picture = null;
+        if (root.TryGetProperty("picture", out var pic))
+        {
+            if (pic.ValueKind == JsonValueKind.String)
+                picture = pic.GetString();
+            else if (pic.ValueKind == JsonValueKind.Object && pic.TryGetProperty("data", out var d) && d.TryGetProperty("url", out var url))
+                picture = url.GetString();
+        }
+        return (email!, name, picture);
     }
 }

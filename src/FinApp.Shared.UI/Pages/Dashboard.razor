@@ -6,15 +6,12 @@
 
 @if (_busy)
 {
-    <div class="saving-pill"><span class="pill-budgie"><TandemLogo /></span> @Loc["Saving…"]</div>
+    <div class="saving-pill"><Spinner Text="@Loc["Saving…"]" /></div>
 }
 
 @if (!State.IsReady)
 {
-    <div class="loading">
-        <div class="loading-budgie"><TandemLogo /></div>
-        <span>@Loc["Loading…"]</span>
-    </div>
+    <div class="loading"><Spinner Block="true" Text="@Loc["Loading…"]" /></div>
 }
 else if (!State.HasAccounts)
 {
@@ -30,6 +27,7 @@ else if (!State.HasAccounts)
         <div class="firstrun-form">
             <label>@Loc["Account name"] <input type="text" placeholder="Personal" @bind="_fName" /></label>
             <label>@Loc["Currency"] <input type="text" maxlength="3" @bind="_fCurrency" /></label>
+            <label>@Loc["Savings target (%)"] <input type="number" min="0" max="100" @bind="_fSavingsTarget" /></label>
             <button @onclick="CreateFirstAccount" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Create account"]</button>
         </div>
         <small class="hint">@Loc["It starts with a few starter categories and the current month’s period — you can change everything."]</small>
@@ -2479,7 +2477,7 @@ else
     private Task CreateFirstAccount() => Run(async () =>
     {
         if (string.IsNullOrWhiteSpace(_fName)) return;
-        await State.AddAccount(_fName!, string.IsNullOrWhiteSpace(_fCurrency) ? "EUR" : _fCurrency!);
+        await State.AddAccount(_fName!, string.IsNullOrWhiteSpace(_fCurrency) ? "EUR" : _fCurrency!, Math.Clamp(_fSavingsTarget, 0, 100) / 100m);
     });
 
     private static string Fmt(Money m)

@@ -69,6 +69,21 @@ carve-out are unchanged. Dark override updated (no more solid bar bg; `.inline-a
   visible while scrolling" matters again, the real fix is a single-row sticky header via a `ModalTitle()`/`PrimarySubmit()`
   dispatch (deferred — big switch over ~30 modals).
 
+## Session 12q (2026-06-30) — first-run savings target, Google avatar transfer, reversed "Tab", unified loader. 116 tests.
+1. **Savings-target input on the first-run create form** (was only in the New-account modal); `CreateFirstAccount` passes
+   `_fSavingsTarget/100` to `AddAccount`.
+2. **Google profile picture is adopted as the avatar** for external sign-in (only when the user has no avatar yet).
+   `ExternalAuthService.CompleteAsync`/`FetchUserAsync` now also return the picture URL (Google flat `picture`, Facebook
+   `picture.data.url`); the callback stores it via `AvatarService.SetAsync(userId, url)`. Avatars are rendered with
+   `<img src>`, so a URL works alongside the existing base64 data-URLs.
+3. **Wordmark "Tab" reversed** — `TandemTab` → `Tandem<span class="brand-tab">Tab</span>`; `.brand-tab` = green text on a
+   white rounded pill (app bar: `MainLayout.razor.css`; sign-in: `AuthPanel.razor.css`, with a mint border on cream).
+4. **One loader everywhere** — new **`Components/Spinner.razor`** (spinning TandemLogo + optional text, `Block` = centred).
+   Replaces the bobbing-logo `.loading` (Dashboard + MainLayout) and backs the `.saving-pill`; the old `.pill-budgie`/
+   `budgie-spin` scoped rules are gone (`.saving-pill ::deep .spinner-text` keeps the pill text white).
+- **Files:** `Pages/Dashboard.razor`(+`.css`), `Layout/MainLayout.razor`(+`.css`), `Components/{AuthPanel.razor+css, Spinner.razor+css}`,
+  `Server/Auth/ExternalAuthService.cs`, `Server/Program.cs` (callback). No domain changes. 116 tests.
+
 ## Session 12p (2026-06-30) — OAuth base switched to the custom domain tandemtab.com.
 `tandemtab.com` is already a Cloud Run domain mapping (DNS → Google 216.239.x anycast, serves the app). Set
 `Auth__PublicBaseUrl=https://tandemtab.com` (finapp-00055), so the Google redirect_uri is now

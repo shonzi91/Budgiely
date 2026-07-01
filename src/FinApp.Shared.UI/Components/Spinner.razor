@@ -1,0 +1,14 @@
+@* The one loading indicator used across the app: a spinning TandemTab logo with optional text.
+   Inline by default; pass Block="true" for a centred full-area loader. *@
+<span class="spinner @(Block ? "spinner-block" : "")">
+    <span class="spinner-logo"><TandemLogo /></span>
+    @if (!string.IsNullOrEmpty(Text))
+    {
+        <span class="spinner-text">@Text</span>
+    }
+</span>
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public bool Block { get; set; }
+}

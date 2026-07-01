@@ -207,7 +207,7 @@ auth.MapGet("/external/{provider}", (string provider, HttpContext http, External
 });
 
 auth.MapGet("/external/{provider}/callback", async (string provider, string? code, string? state,
-    HttpContext http, ExternalAuthService ext, AuthService authSvc, IConfiguration cfg, CancellationToken ct) =>
+    HttpContext http, ExternalAuthService ext, AuthService authSvc, AvatarService avatars, IConfiguration cfg, CancellationToken ct) =>
 {
     if (!ext.IsEnabled(provider) || string.IsNullOrEmpty(code)) return Results.Redirect("/?authError=1");
     var expectedState = http.Request.Cookies["finapp_oauth_state"];
@@ -216,8 +216,11 @@ auth.MapGet("/external/{provider}/callback", async (string provider, string? cod
     try
     {
         var redirectUri = ExternalRedirectUri(http, cfg, provider);
-        var (email, name) = await ext.CompleteAsync(provider, code, redirectUri, ct);
+        var (email, name, picture) = await ext.CompleteAsync(provider, code, redirectUri, ct);
         var result = await authSvc.FindOrCreateExternalUserAsync(email, name, ct);
+        // Adopt the provider's profile picture only if the user hasn't set one of their own.
+        if (!string.IsNullOrWhiteSpace(picture) && await avatars.GetAsync(result.UserId, ct) is null)
+            await avatars.SetAsync(result.UserId, picture, ct);
         // Hand the token to the SPA via the URL fragment (never sent to the server again; the client reads + clears it).
         return Results.Redirect($"/#access_token={Uri.EscapeDataString(result.Token)}");
     }
