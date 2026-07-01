@@ -69,6 +69,16 @@ carve-out are unchanged. Dark override updated (no more solid bar bg; `.inline-a
   visible while scrolling" matters again, the real fix is a single-row sticky header via a `ModalTitle()`/`PrimarySubmit()`
   dispatch (deferred — big switch over ~30 modals).
 
+## Session 12o (2026-06-30) — Google login WIRED UP in prod (Facebook still off).
+Configured Google OAuth on Cloud Run (revision finapp-00053+): client secret stored in **Secret Manager
+`finapp-google-client-secret`** (runtime SA `85638328674-compute@...` granted `secretAccessor`), then
+`gcloud run services update finapp --region europe-west1 --update-secrets=Auth__Google__ClientSecret=finapp-google-client-secret:latest`
+`--update-env-vars=Auth__Google__ClientId=85638328674-go3slhmljjfl4aehmv9ipipkkglrmpc8.apps.googleusercontent.com,Auth__PublicBaseUrl=https://finapp-85638328674.europe-west1.run.app`.
+Verified live: `/auth/providers` → `{"google":true,"facebook":false}`; `/auth/external/google` 302s to Google with the
+correct client_id + redirect_uri `https://finapp-85638328674.europe-west1.run.app/auth/external/google/callback` (registered
+in the Google console; OAuth consent screen in Testing mode — add test users). **`gcloud run deploy --source .` preserves this
+config** (confirmed on finapp-00054). Facebook: same pattern when its app is created (`Auth__Facebook__AppId/AppSecret`).
+
 ## Session 12m (2026-06-30) — Google + Facebook login (manual OAuth). 116 tests. ⚠️ needs provider credentials to switch on.
 Scaffolded external sign-in. **Inert until configured** (buttons hidden, `/auth/external/*` → 404 when a provider has no
 client id/secret), so it's safe in prod as-is.
