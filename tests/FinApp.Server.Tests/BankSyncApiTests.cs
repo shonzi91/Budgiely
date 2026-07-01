@@ -68,4 +68,26 @@ public class BankSyncApiTests : IClassFixture<FinAppServerFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task Merchant_mappings_persist_and_can_be_removed()
+    {
+        var (client, accountId) = await AccountAsync("bankMap");
+        var target = Guid.NewGuid();
+
+        // Descriptions differing only by case/whitespace normalize to the same rule.
+        var put = await client.PutAsJsonAsync($"/accounts/{accountId}/bank/mappings",
+            new SetBankMappingRequest("  TESCO   STORES ", "category", target));
+        put.EnsureSuccessStatusCode();
+
+        var mappings = await client.GetFromJsonAsync<List<BankMappingDto>>($"/accounts/{accountId}/bank/mappings");
+        var rule = Assert.Single(mappings!);
+        Assert.Equal("tesco stores", rule.MatchKey);
+        Assert.Equal("category", rule.Kind);
+        Assert.Equal(target, rule.TargetId);
+
+        var del = await client.DeleteAsync($"/accounts/{accountId}/bank/mappings?description={Uri.EscapeDataString("tesco stores")}");
+        Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
+        Assert.Empty((await client.GetFromJsonAsync<List<BankMappingDto>>($"/accounts/{accountId}/bank/mappings"))!);
+    }
 }

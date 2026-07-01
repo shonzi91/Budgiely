@@ -711,7 +711,9 @@ input[type=date]::-webkit-calendar-picker-indicator:hover { opacity: 1; backgrou
 .bank-tx-meta { color: #9ca3af; font-size: .82rem; margin-top: 2px; }
 .bank-tx-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .bank-tx-form select { flex: 1 1 140px; min-width: 0; }
-.bank-tx-actions { display: flex; gap: 8px; margin-top: 8px; }
+.bank-tx-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.map-chip { border: none; background: #eef6f2; color: #0e7a54; border-radius: 999px; padding: 1px 8px; font-size: .72rem; font-weight: 600; cursor: pointer; margin-left: 6px; }
+.map-chip:hover { background: #dcefe6; }
 .bank-panel button.primary { padding: 8px 14px; border: none; border-radius: 8px; background: #13a06e; color: #fff; font-weight: 600; cursor: pointer; }
 .bank-panel button.primary:disabled { background: #c7c9d6; cursor: not-allowed; }
 

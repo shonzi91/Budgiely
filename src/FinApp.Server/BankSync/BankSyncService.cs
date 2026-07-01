@@ -45,7 +45,16 @@ public sealed class BankSyncService(FinAppDbContext db, EnableBankingClient eb, 
             "\"AccountId\" text NOT NULL, \"ExternalId\" text NOT NULL, \"Date\" text NOT NULL, " +
             "\"Amount\" text NOT NULL, \"Description\" text NOT NULL, \"Status\" text NOT NULL, " +
             "PRIMARY KEY (\"AccountId\", \"ExternalId\"))", ct);
+        // Learned merchant rules: a normalized description maps to a category (debits) or fund/contributor (credits).
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TABLE IF NOT EXISTS \"BankMappings\" (" +
+            "\"AccountId\" text NOT NULL, \"MatchKey\" text NOT NULL, \"Kind\" text NOT NULL, \"TargetId\" text NOT NULL, " +
+            "PRIMARY KEY (\"AccountId\", \"MatchKey\"))", ct);
     }
+
+    /// <summary>Normalized merchant key used to match a transaction description to a saved rule.</summary>
+    public static string MatchKeyOf(string description) =>
+        string.Join(' ', (description ?? "").ToLowerInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     public async Task<List<BankInstitutionDto>> SearchInstitutionsAsync(Guid userId, Guid accountId, string countryCode, CancellationToken ct = default)
     {
@@ -180,6 +189,68 @@ public sealed class BankSyncService(FinAppDbContext db, EnableBankingClient eb, 
             AddParam(cmd, "@status", confirmed ? "Confirmed" : "Dismissed");
             AddParam(cmd, "@acc", accountId.ToString());
             AddParam(cmd, "@ext", externalId);
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        finally { if (opened) await conn.CloseAsync(); }
+    }
+
+    // --- Merchant mapping rules (feature 2.3) -----------------------------
+
+    public async Task<List<BankMappingDto>> GetMappingsAsync(Guid userId, Guid accountId, CancellationToken ct = default)
+    {
+        await EnsureContributorAsync(userId, accountId, ct);
+        var result = new List<BankMappingDto>();
+        var conn = db.Database.GetDbConnection();
+        var opened = await OpenAsync(conn, ct);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT \"MatchKey\", \"Kind\", \"TargetId\" FROM \"BankMappings\" WHERE \"AccountId\" = @acc";
+            AddParam(cmd, "@acc", accountId.ToString());
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+                if (Guid.TryParse(reader.GetString(2), out var target))
+                    result.Add(new BankMappingDto(reader.GetString(0), reader.GetString(1), target));
+        }
+        finally { if (opened) await conn.CloseAsync(); }
+        return result;
+    }
+
+    /// <summary>Save (or replace) the rule for a merchant: kind is "category", "fund" or "contributor".</summary>
+    public async Task SetMappingAsync(Guid userId, Guid accountId, string description, string kind, Guid targetId, CancellationToken ct = default)
+    {
+        await EnsureContributorAsync(userId, accountId, ct);
+        var key = MatchKeyOf(description);
+        if (key.Length == 0) throw new BadRequestException("Can't map an empty merchant.");
+        var conn = db.Database.GetDbConnection();
+        var opened = await OpenAsync(conn, ct);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "INSERT INTO \"BankMappings\" (\"AccountId\", \"MatchKey\", \"Kind\", \"TargetId\") VALUES (@acc, @key, @kind, @target) " +
+                "ON CONFLICT (\"AccountId\", \"MatchKey\") DO UPDATE SET \"Kind\" = @kind, \"TargetId\" = @target";
+            AddParam(cmd, "@acc", accountId.ToString());
+            AddParam(cmd, "@key", key);
+            AddParam(cmd, "@kind", kind);
+            AddParam(cmd, "@target", targetId.ToString());
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        finally { if (opened) await conn.CloseAsync(); }
+    }
+
+    /// <summary>Remove a merchant rule. Does not touch any expenses/contributions already created from it.</summary>
+    public async Task RemoveMappingAsync(Guid userId, Guid accountId, string description, CancellationToken ct = default)
+    {
+        await EnsureContributorAsync(userId, accountId, ct);
+        var conn = db.Database.GetDbConnection();
+        var opened = await OpenAsync(conn, ct);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM \"BankMappings\" WHERE \"AccountId\" = @acc AND \"MatchKey\" = @key";
+            AddParam(cmd, "@acc", accountId.ToString());
+            AddParam(cmd, "@key", MatchKeyOf(description));
             await cmd.ExecuteNonQueryAsync(ct);
         }
         finally { if (opened) await conn.CloseAsync(); }

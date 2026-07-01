@@ -976,6 +976,15 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     /// <summary>Drop the current account's bank connection so it can be linked again.</summary>
     public Task DisconnectBank() => api.DisconnectBankAsync(CurrentAccountId);
 
+    public Task<List<BankMappingDto>> GetBankMappings() => api.GetBankMappingsAsync(CurrentAccountId);
+    public Task SetBankMapping(string description, string kind, Guid targetId) =>
+        api.SetBankMappingAsync(CurrentAccountId, description, kind, targetId);
+    public Task RemoveBankMapping(string description) => api.RemoveBankMappingAsync(CurrentAccountId, description);
+
+    /// <summary>Normalize a bank description to the same key the server matches rules against (MatchKeyOf).</summary>
+    public static string BankMatchKey(string description) =>
+        string.Join(' ', (description ?? "").ToLowerInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
     public Task ReschedulePeriod(DateOnly from, DateOnly to)
     {
         Account.ReschedulePeriod(Period, from, to);

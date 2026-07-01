@@ -832,27 +832,54 @@ else
                                 @foreach (var t in bankRows)
                                 {
                                     var tx = t;
+                                    var id = tx.ExternalId;
                                     var isDebit = tx.Amount < 0;
+                                    var mappedLabel = MappedLabel(tx.Description);
                                     <li class="bank-tx">
                                         <div class="bank-tx-head">
-                                            <span class="bank-tx-desc">@tx.Description</span>
+                                            <span class="bank-tx-desc">@tx.Description
+                                                @if (mappedLabel is not null)
+                                                {
+                                                    <button class="map-chip" title="@Loc["Stop auto-filling this merchant"]" @onclick="() => ForgetMapping(tx)" disabled="@_bankBusy">🔖 @mappedLabel ✕</button>
+                                                }
+                                            </span>
                                             <span class="amt @(isDebit ? "" : "credit")">@Fmt(new Money(Math.Abs(tx.Amount), State.Currency))</span>
                                         </div>
                                         <div class="bank-tx-meta">@tx.Date.ToString("dd MMM yyyy")@(isDebit ? "" : $" · {Loc["money in"]}")</div>
                                         @if (isDebit)
                                         {
                                             <div class="bank-tx-form">
-                                                <select @bind="_bankCat">
+                                                <select value="@RowCat(id)" @onchange="e => _bankRowCat[id] = Guid.Parse(e.Value?.ToString() ?? Guid.Empty.ToString())">
                                                     @foreach (var (cat, depth) in State.CategoryOptions)
                                                     {
                                                         <option value="@cat.Id">@CatOption(cat.Id, cat.Name, depth)</option>
                                                     }
                                                 </select>
-                                                <select @bind="_bankFund">
+                                                <select value="@RowFund(id)" @onchange="e => _bankRowFund[id] = Guid.Parse(e.Value?.ToString() ?? Guid.Empty.ToString())">
                                                     @foreach (var f in State.RootFunds)
                                                     {
                                                         <option value="@f.Id">@f.Name</option>
                                                     }
+                                                </select>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="bank-tx-form">
+                                                <select value="@RowCredit(id)" @onchange="e => _bankRowCredit[id] = e.Value?.ToString() ?? string.Empty">
+                                                    <option value="">@Loc["Map to… (optional)"]</option>
+                                                    <optgroup label="@Loc["Funds"]">
+                                                        @foreach (var f in State.RootFunds)
+                                                        {
+                                                            <option value="fund:@f.Id">@f.Name</option>
+                                                        }
+                                                    </optgroup>
+                                                    <optgroup label="@Loc["People"]">
+                                                        @foreach (var m in State.RealUsers)
+                                                        {
+                                                            <option value="contributor:@m.UserId">@m.DisplayName</option>
+                                                        }
+                                                    </optgroup>
                                                 </select>
                                             </div>
                                         }
@@ -861,6 +888,7 @@ else
                                             {
                                                 <button class="primary" @onclick="() => ConfirmBankRow(tx)" disabled="@_bankBusy">@Loc["Add expense"]</button>
                                             }
+                                            <button class="ghost" title="@Loc["Always use this for this merchant"]" @onclick="() => RememberMapping(tx)" disabled="@_bankBusy">🔖 @Loc["Remember"]</button>
                                             <button class="ghost" @onclick="() => DismissBankRow(tx)" disabled="@_bankBusy">@Loc["Dismiss"]</button>
                                         </div>
                                     </li>
@@ -1695,10 +1723,14 @@ else
     // Bank sync (Open Banking) — its own tab. Null status = feature off / unreachable (tab hidden).
     private BankSyncStatusDto? _bankStatus;
     private List<PendingBankTransactionDto> _bankPending = [];
-    private Guid _bankCat, _bankFund;   // shared pickers for the row being reviewed (one at a time)
     private Guid _bankAccountId;        // which account _bankStatus/_bankPending belong to (bank is per-account)
     private bool _bankBusy;
     private string? _bankError;
+    // Merchant rules + per-row picks (feature 2.3). Rules keyed by normalized merchant; picks keyed by transaction id.
+    private Dictionary<string, (string Kind, Guid TargetId)> _bankMappings = new();
+    private readonly Dictionary<string, Guid> _bankRowCat = new();      // debit → category
+    private readonly Dictionary<string, Guid> _bankRowFund = new();     // debit → fund
+    private readonly Dictionary<string, string> _bankRowCredit = new(); // credit → "fund:guid" | "contributor:guid"
     private DateOnly _expenseDate = DateOnly.FromDateTime(DateTime.Today);
     private DateOnly? _dayView;   // when set, the Expenses tab focuses a single day
     private bool _calendar;       // Expenses tab: month-grid view instead of the list
@@ -1859,7 +1891,12 @@ else
         try
         {
             _bankStatus = await State.GetBankStatus();
-            _bankPending = _bankStatus.Connected ? await State.GetPendingBankTransactions() : [];
+            if (_bankStatus.Connected)
+            {
+                _bankPending = await State.GetPendingBankTransactions();
+                _bankMappings = (await State.GetBankMappings()).ToDictionary(m => m.MatchKey, m => (m.Kind, m.TargetId));
+            }
+            else { _bankPending = []; _bankMappings = new(); }
             DefaultBankPickers();
         }
         catch { _bankStatus = null; } // unreachable/unconfigured — hide the panel/tab entirely
@@ -1896,9 +1933,24 @@ else
 
     private void DefaultBankPickers()
     {
-        _bankCat = State.CategoryOptions.FirstOrDefault().Category?.Id ?? Guid.Empty;
-        _bankFund = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
+        var firstCat = State.CategoryOptions.FirstOrDefault().Category?.Id ?? Guid.Empty;
+        var firstFund = State.RootFunds.FirstOrDefault()?.Id ?? Guid.Empty;
+        _bankRowCat.Clear(); _bankRowFund.Clear(); _bankRowCredit.Clear();
+        foreach (var t in _bankPending)
+        {
+            var mapped = MappingFor(t.Description);
+            _bankRowCat[t.ExternalId] = mapped is { Kind: "category" } m && State.CategoryOptions.Any(c => c.Category.Id == m.TargetId) ? m.TargetId : firstCat;
+            _bankRowFund[t.ExternalId] = firstFund;
+            _bankRowCredit[t.ExternalId] = mapped is { Kind: "fund" or "contributor" } cm ? $"{cm.Kind}:{cm.TargetId}" : "";
+        }
     }
+
+    private (string Kind, Guid TargetId)? MappingFor(string description) =>
+        _bankMappings.TryGetValue(BudgetingState.BankMatchKey(description), out var m) ? m : null;
+
+    private Guid RowCat(string id) => _bankRowCat.TryGetValue(id, out var v) ? v : Guid.Empty;
+    private Guid RowFund(string id) => _bankRowFund.TryGetValue(id, out var v) ? v : Guid.Empty;
+    private string RowCredit(string id) => _bankRowCredit.TryGetValue(id, out var v) ? v : "";
 
     private async Task LinkBankAsync()
     {
@@ -1946,11 +1998,13 @@ else
 
     private async Task ConfirmBankRow(PendingBankTransactionDto tx)
     {
-        if (_bankCat == Guid.Empty || _bankFund == Guid.Empty) { _bankError = Loc["Pick a category and fund first."]; return; }
+        var cat = RowCat(tx.ExternalId);
+        var fund = RowFund(tx.ExternalId);
+        if (cat == Guid.Empty || fund == Guid.Empty) { _bankError = Loc["Pick a category and fund first."]; return; }
         _bankBusy = true; _bankError = null;
         try
         {
-            await State.ConfirmBankTransaction(tx.ExternalId, _bankCat, Math.Abs(tx.Amount), _bankFund, tx.Description, ClampToPeriod(tx.Date));
+            await State.ConfirmBankTransaction(tx.ExternalId, cat, Math.Abs(tx.Amount), fund, tx.Description, ClampToPeriod(tx.Date));
             _bankPending.RemoveAll(p => p.ExternalId == tx.ExternalId);
         }
         catch (Exception ex) { _bankError = ex.Message; }
@@ -1967,6 +2021,57 @@ else
         }
         catch (Exception ex) { _bankError = ex.Message; }
         finally { _bankBusy = false; }
+    }
+
+    // --- Merchant mapping (feature 2.3) -----------------------------------
+    /// <summary>Remember the current pick for this merchant so future imports pre-fill it. Debits map to the
+    /// chosen category; credits map to the chosen fund/contributor (kept for when credits become entries).</summary>
+    private async Task RememberMapping(PendingBankTransactionDto tx)
+    {
+        _bankBusy = true; _bankError = null;
+        try
+        {
+            string kind; Guid target;
+            if (tx.Amount < 0) { kind = "category"; target = RowCat(tx.ExternalId); }
+            else
+            {
+                var (k, t) = ParseCredit(RowCredit(tx.ExternalId));
+                kind = k; target = t;
+            }
+            if (target == Guid.Empty) { _bankError = Loc["Pick something to map to first."]; return; }
+            await State.SetBankMapping(tx.Description, kind, target);
+            _bankMappings[BudgetingState.BankMatchKey(tx.Description)] = (kind, target);
+        }
+        catch (Exception ex) { _bankError = ex.Message; }
+        finally { _bankBusy = false; }
+    }
+
+    private async Task ForgetMapping(PendingBankTransactionDto tx)
+    {
+        _bankBusy = true; _bankError = null;
+        try
+        {
+            await State.RemoveBankMapping(tx.Description);
+            _bankMappings.Remove(BudgetingState.BankMatchKey(tx.Description));
+        }
+        catch (Exception ex) { _bankError = ex.Message; }
+        finally { _bankBusy = false; }
+    }
+
+    private static (string Kind, Guid Target) ParseCredit(string v) =>
+        v.Split(':') is [{ } k, { } g] && Guid.TryParse(g, out var id) ? (k, id) : ("fund", Guid.Empty);
+
+    /// <summary>The friendly name of a saved mapping's target (for the chip), or null if none.</summary>
+    private string? MappedLabel(string description)
+    {
+        if (MappingFor(description) is not { } m) return null;
+        return m.Kind switch
+        {
+            "category" => State.CategoryName(m.TargetId),
+            "fund" => State.FundName(m.TargetId),
+            "contributor" => State.MemberName(m.TargetId),
+            _ => null,
+        };
     }
 
     /// <summary>Open the Spending tab focused on today's expenses (clamped into the current period).</summary>

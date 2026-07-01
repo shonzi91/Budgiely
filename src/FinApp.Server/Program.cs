@@ -352,6 +352,21 @@ accounts.MapDelete("/{id:guid}/bank/connection", async (Guid id, ClaimsPrincipal
     return Results.NoContent();
 });
 
+accounts.MapGet("/{id:guid}/bank/mappings", async (Guid id, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+    Results.Ok(await svc.GetMappingsAsync(user.UserId(), id, ct)));
+
+accounts.MapPut("/{id:guid}/bank/mappings", async (Guid id, SetBankMappingRequest req, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+{
+    await svc.SetMappingAsync(user.UserId(), id, req.Description, req.Kind, req.TargetId, ct);
+    return Results.NoContent();
+});
+
+accounts.MapDelete("/{id:guid}/bank/mappings", async (Guid id, string description, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+{
+    await svc.RemoveMappingAsync(user.UserId(), id, description, ct);
+    return Results.NoContent();
+});
+
 // Public: the bank redirects here (with ?code=<auth code>&state=<accountId>) after the user consents. No auth —
 // the code is exchanged with Enable Banking server-side to prove real consent — then we bounce to the SPA.
 app.MapGet("/bank/callback", async (string? code, string? state, BankSyncService svc, CancellationToken ct) =>

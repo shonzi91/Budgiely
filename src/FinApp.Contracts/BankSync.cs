@@ -17,3 +17,10 @@ public record PendingBankTransactionDto(string ExternalId, decimal Amount, DateO
 
 /// <summary>Mark a staged transaction as handled: <see cref="Confirmed"/> = turned into an expense, else dismissed.</summary>
 public record BankTransactionAck(string ExternalId, bool Confirmed);
+
+/// <summary>A learned merchant rule. <see cref="Kind"/> is "category" (debits), "fund" or "contributor" (credits);
+/// <see cref="MatchKey"/> is the normalized description the server matches against.</summary>
+public record BankMappingDto(string MatchKey, string Kind, Guid TargetId);
+
+/// <summary>Save a merchant rule from a transaction's <see cref="Description"/>.</summary>
+public record SetBankMappingRequest(string Description, string Kind, Guid TargetId);
