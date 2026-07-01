@@ -825,7 +825,7 @@ else
                             }
                         </ul>
                     }
-                    <div class="modal-actions">
+                    <div class="modal-actions inline-actions">
                         <button class="ghost" @onclick="Back">@Loc["Cancel"]</button>
                         <button @onclick="SaveEditCat" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Save"]</button>
                     </div>
@@ -885,7 +885,7 @@ else
                             <li><em>@Loc["No expenses in this category yet."]</em></li>
                         }
                     </ul>
-                    <div class="modal-actions">
+                    <div class="modal-actions inline-actions">
                         <button class="ghost" @onclick="Back">@Loc["Close"]</button>
                     </div>
                     break;

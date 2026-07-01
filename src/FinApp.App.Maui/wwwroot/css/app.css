@@ -135,8 +135,8 @@ html.dark .firstrun-form input, html.dark .dates-form input, html.dark .contrib-
 html.dark option { background: #1e2330; color: #e8eaf0; }
 html.dark input[type=date] { color-scheme: dark; }
 
-/* Sticky modal action bar */
-html.dark .modal-actions { background: #181c25; border-bottom-color: #262d3d; }
+/* Modal action buttons (corner ✕/✓) — the inline variant keeps a top divider */
+html.dark .modal-actions.inline-actions { border-top-color: #262d3d; }
 
 /* Tabs + list separators + tracks */
 html.dark .tabs { border-bottom-color: #262d3d; }

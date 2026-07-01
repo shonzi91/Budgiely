@@ -462,15 +462,19 @@ input[type=date]::-webkit-calendar-picker-indicator {
 }
 input[type=date]::-webkit-calendar-picker-indicator:hover { opacity: 1; background: #e4f6ee; }
 .modal .check { flex-direction: row; align-items: center; color: #1f2430; }
-/* Sticky action bar pulled to the top of the (scrolling) modal; Cancel→✕, primary→✓ via CSS. */
+/* Modal header: title sits top-left, the Cancel/confirm buttons float in the top-right corner as ✕/✓
+   (a natural dialog header). The two rich modals that already have their own header row use `.inline-actions`
+   to keep their buttons in normal flow at the bottom instead. */
+.modal > h3 { order: -2; margin: 0 0 6px; padding-right: 96px; }
 .modal-actions {
-    order: -1; position: sticky; top: 0; z-index: 5;
-    display: flex; justify-content: flex-end; align-items: center; gap: 8px;
-    margin: -18px -20px 8px; padding: 10px 20px;
-    background: #fff; border-bottom: 1px solid #eceef2;
+    position: absolute; top: 15px; right: 18px; z-index: 5;
+    display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; background: none; border: none;
+}
+.modal-actions.inline-actions {
+    position: static; justify-content: flex-end; margin-top: 8px; padding-top: 10px; border-top: 1px solid #eceef2;
 }
 .modal-actions button {
-    padding: 8px 14px; min-width: 46px; border: none; border-radius: 10px; background: #13a06e; color: #fff;
+    padding: 8px 13px; min-width: 44px; border: none; border-radius: 10px; background: #13a06e; color: #fff;
     font-weight: 600; cursor: pointer; line-height: 1.2;
 }
 .modal-actions button:disabled { background: #c7c9d6; cursor: not-allowed; }

@@ -56,6 +56,19 @@ mint/cream look. **Everything is derived from existing domain reads — no domai
 - **Possible follow-ups:** add an InsightsService unit test (no test project covers Shared.UI today); localize the generated
   sentences; a "How it's calculated" expander for the score; the savings gauge track is fixed at 0–40% (clamps if target > 40%).
 
+## Session 12n (2026-06-30) — modal header made natural. UI-only.
+The sticky ✓/✗ bar (12l) felt detached (buttons floated above the title). Reworked to a **natural dialog header**: the
+title sits top-left and the Cancel/confirm buttons **float in the top-right corner as ✕/✓** (`.modal-actions` is now
+`position:absolute; top/right` inside the relative `.modal`; the title `<h3>` gets `padding-right:96px` to clear them).
+The two rich modals that already have their own header row (EditCat, CategoryDetail — they use `.modal-head` with
+title+edit/delete icons) opt out via **`class="modal-actions inline-actions"`** — their buttons stay in normal flow at the
+bottom with a top divider (avoids overlapping the corner). The ✕/✓ `::before` icon swap + secondary-`.ghost.danger` text
+carve-out are unchanged. Dark override updated (no more solid bar bg; `.inline-actions` keeps a dark top border). app.css → ?v=6.
+- **Files:** `Pages/Dashboard.razor` (2 `inline-actions` classes) + `.css` (`.modal-actions`), both `wwwroot/css/app.css`, web `index.html`.
+  NOTE: corner buttons are `absolute`, so on a long scrolling modal they scroll with the content (not pinned). If "always
+  visible while scrolling" matters again, the real fix is a single-row sticky header via a `ModalTitle()`/`PrimarySubmit()`
+  dispatch (deferred — big switch over ~30 modals).
+
 ## Session 12m (2026-06-30) — Google + Facebook login (manual OAuth). 116 tests. ⚠️ needs provider credentials to switch on.
 Scaffolded external sign-in. **Inert until configured** (buttons hidden, `/auth/external/*` → 404 when a provider has no
 client id/secret), so it's safe in prod as-is.
