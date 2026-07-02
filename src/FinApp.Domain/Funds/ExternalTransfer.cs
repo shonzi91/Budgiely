@@ -18,6 +18,10 @@ public sealed class ExternalTransfer : Entity
     public Guid? ToAccountId { get; }
     public string? Note { get; }
 
+    /// <summary>True when the source fund was synced (bank-mirrored) at creation, so this outflow doesn't
+    /// reduce the fund's balance (the real bank balance handles it). See <see cref="Fund.IsSynced"/>.</summary>
+    public bool FundSynced { get; private set; }
+
     public ExternalTransfer(Guid fundId, Money amount, DateOnly date, Guid? toAccountId = null, string? note = null)
     {
         if (amount.IsNegative || amount.IsZero)
@@ -28,4 +32,6 @@ public sealed class ExternalTransfer : Entity
         ToAccountId = toAccountId;
         Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
     }
+
+    public void SetFundSynced(bool synced) => FundSynced = synced;
 }

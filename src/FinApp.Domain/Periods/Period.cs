@@ -141,12 +141,15 @@ public sealed class Period : Entity
     /// </summary>
     public Money FundBalance(Guid fundId)
     {
+        // Entries created while a fund was synced (bank-mirrored) carry a per-side marker and are excluded here —
+        // the real bank balance is authoritative for a synced fund. Markers default false, so pre-sync data is
+        // unaffected and toggling a fund's sync flag never changes already-recorded balances.
         var opening = Sum(_initialBalances.Where(b => b.FundId == fundId).Select(b => b.Amount));
-        var transfersIn = Sum(_fundTransfers.Where(t => t.ToFundId == fundId).Select(t => t.Amount));
-        var transfersOut = Sum(_fundTransfers.Where(t => t.FromFundId == fundId).Select(t => t.Amount));
-        var spent = Sum(_expenses.Where(e => e.FundId == fundId).Select(e => e.Amount));
-        var sentOut = Sum(_externalTransfers.Where(t => t.FundId == fundId).Select(t => t.Amount));
-        var depositsIn = Sum(_contributions.Where(c => c.MemberId != CarryoverSource && c.FundId == fundId).Select(c => c.Paid));
+        var transfersIn = Sum(_fundTransfers.Where(t => t.ToFundId == fundId && !t.ToSynced).Select(t => t.Amount));
+        var transfersOut = Sum(_fundTransfers.Where(t => t.FromFundId == fundId && !t.FromSynced).Select(t => t.Amount));
+        var spent = Sum(_expenses.Where(e => e.FundId == fundId && !e.FundSynced).Select(e => e.Amount));
+        var sentOut = Sum(_externalTransfers.Where(t => t.FundId == fundId && !t.FundSynced).Select(t => t.Amount));
+        var depositsIn = Sum(_contributions.Where(c => c.MemberId != CarryoverSource && c.FundId == fundId && !c.FundSynced).Select(c => c.Paid));
         return opening + transfersIn + depositsIn - transfersOut - spent - sentOut;
     }
 

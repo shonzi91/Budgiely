@@ -72,6 +72,7 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             f.Property(x => x.Note);
             f.Ignore(x => x.IsRoot);
             f.Ignore(x => x.Icon);  // body data — in the snapshot, not a relational column
+            f.Ignore(x => x.IsSynced);  // body data — synced-fund flag rides in the snapshot
         });
 
         b.Entity<User>(u =>
@@ -183,6 +184,7 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             t.Property(x => x.Date);
             t.Property(x => x.ToAccountId);
             t.Property(x => x.Note);
+            t.Ignore(x => x.FundSynced);  // body data — synced-fund marker rides in the snapshot
         });
 
         b.Entity<InitialBalance>(i =>
@@ -203,6 +205,8 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             t.Property(x => x.Amount).HasConversion(money).IsRequired();
             t.Property(x => x.Date);
             t.Property(x => x.Note);
+            t.Ignore(x => x.FromSynced);  // body data — synced-fund markers ride in the snapshot
+            t.Ignore(x => x.ToSynced);
         });
 
         b.Entity<Contribution>(c =>
@@ -214,6 +218,7 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             c.Property(x => x.FundId);
             c.Property(x => x.Date);
             c.Property(x => x.Paid).HasConversion(money).IsRequired();
+            c.Ignore(x => x.FundSynced);  // body data — synced-fund marker rides in the snapshot
         });
 
         b.Entity<Budget>(bu =>
@@ -247,6 +252,7 @@ public sealed class FinAppDbContext(DbContextOptions<FinAppDbContext> options) :
             e.Ignore(x => x.IsSettlementSource);
             e.Ignore(x => x.IsSettlementDestination);
             e.Ignore(x => x.OriginalAmount);
+            e.Ignore(x => x.FundSynced);  // body data — synced-fund marker rides in the snapshot
         });
 
         b.Entity<SavingAllocation>(s =>

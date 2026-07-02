@@ -1584,6 +1584,14 @@ else
                     @iconPicker
                     <label>@Loc["Note (optional)"] <input type="text" @bind="_fundNote" /></label>
                     <label>@Loc["Opening balance this period"] <input type="text" inputmode="text" @bind:get="_openingAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)" @bind:set="v => _openingAmount = EvalSum(v)" /></label>
+                    @if (_bankStatus?.Enabled == true)
+                    {
+                        <label class="check"><input type="checkbox" @bind="_fSynced" /> @Loc["Synced with a linked bank account"]</label>
+                        @if (_fSynced)
+                        {
+                            <small class="hint">@Loc["Expenses, transfers and deposits won’t change this fund’s balance — the bank’s real balance is authoritative. Only affects entries created from now on."]</small>
+                        }
+                    }
                     <div class="modal-actions">
                         <button class="ghost" @onclick="Back">@Loc["Cancel"]</button>
                         <button @onclick="SaveFund" disabled="@(string.IsNullOrWhiteSpace(_fName))">@Loc["Save"]</button>
@@ -1795,6 +1803,7 @@ else
     private Guid _modalFundId;
     private string? _fundNote;
     private decimal _openingAmount;
+    private bool _fSynced;   // Edit-fund: "synced with a linked bank account"
     private Guid _moveBalanceToId;
 
     private Guid _depCategoryId;
@@ -2604,6 +2613,7 @@ else
         _fIcon = State.FundStoredIcon(fundId);
         _fundNote = State.FundNote(fundId);
         _openingAmount = State.FundOpeningBalance(fundId).Amount;
+        _fSynced = State.FundIsSynced(fundId);
         _modal = Modal.EditFund;
     }
 
@@ -2623,6 +2633,8 @@ else
             await State.SetFundNote(_modalFundId, _fundNote);
             await State.SetFundIcon(_modalFundId, _fIcon);
             await State.SetFundOpeningBalance(_modalFundId, _openingAmount);
+            if (_fSynced != State.FundIsSynced(_modalFundId))
+                await State.SetFundSynced(_modalFundId, _fSynced);
         }
         var after = _afterCreate; _afterCreate = null;
         Back();

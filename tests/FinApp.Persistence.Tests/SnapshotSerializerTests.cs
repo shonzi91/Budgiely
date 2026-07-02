@@ -113,6 +113,30 @@ public class SnapshotSerializerTests
     }
 
     [Fact]
+    public void Synced_fund_flag_and_per_entry_markers_round_trip()
+    {
+        var owner = Guid.NewGuid();
+        var account = new Account("Home", "EUR");
+        account.AssignOwner(owner, "Me");
+        account.AddDefaultFunds();
+        var bank = account.FundId("Bank");
+        account.Funds.Single(f => f.Id == bank).SetSynced(true);
+        var food = account.AddCategory("Food");
+
+        var p = account.StartPeriod(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31));
+        p.SetInitialBalance(bank, Eur(1000));
+        var e = new Expense(food.Id, Eur(40), new DateOnly(2026, 1, 4), owner, bank);
+        e.SetFundSynced(true);
+        p.AddExpense(e);
+
+        var copy = AccountSnapshotSerializer.Deserialize(AccountSnapshotSerializer.Serialize(account));
+
+        Assert.True(copy.Funds.Single(f => f.Id == bank).IsSynced);
+        Assert.True(copy.Periods.Single().Expenses.Single().FundSynced);
+        Assert.Equal(Eur(1000), copy.Periods.Single().FundBalance(bank));   // synced expense excluded, as before the round-trip
+    }
+
+    [Fact]
     public void Legacy_snapshot_without_savings_target_defaults_to_20_percent()
     {
         // A snapshot produced before SavingsRateTarget existed has no such field.

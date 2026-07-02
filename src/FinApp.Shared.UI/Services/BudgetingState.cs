@@ -524,17 +524,23 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
 
     // --- Commands ---------------------------------------------------------
 
+    /// <summary>Whether a fund is currently synced to a bank account (its balance is externally authoritative).</summary>
+    public bool FundIsSynced(Guid fundId) => _account?.Funds.FirstOrDefault(f => f.Id == fundId)?.IsSynced ?? false;
+
     public Task AddExpense(Guid categoryId, decimal amount, Guid fundId, string? note, DateOnly date, bool onBehalfOfOtherAccount = false)
     {
-        Period.AddExpense(new Expense(categoryId, Money(amount), date, CurrentMemberId, fundId, note,
-            onBehalfOfOtherAccount: onBehalfOfOtherAccount));
+        var expense = new Expense(categoryId, Money(amount), date, CurrentMemberId, fundId, note,
+            onBehalfOfOtherAccount: onBehalfOfOtherAccount);
+        expense.SetFundSynced(FundIsSynced(fundId));   // synced funds aren't debited (real bank balance handles it)
+        Period.AddExpense(expense);
         return SaveAsync();
     }
 
     public async Task EditExpense(Guid expenseId, Guid categoryId, decimal amount, Guid fundId, string? note, DateOnly date)
     {
         var before = Period.Expenses.FirstOrDefault(e => e.Id == expenseId);
-        Period.EditExpense(expenseId, categoryId, Money(amount), fundId, note, date);
+        var edited = Period.EditExpense(expenseId, categoryId, Money(amount), fundId, note, date);
+        edited.SetFundSynced(FundIsSynced(fundId));   // recompute at edit time (moving to/from a synced fund)
         await SaveAsync();
         // Editing a settlement-destination expense mirrors the new amount back to the source expense.
         if (before is { IsSettlementDestination: true, SettlementId: { } sid, SettledFromAccountId: { } sourceAccount })
@@ -557,7 +563,8 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     /// <summary>Record a deposit for the signed-in user, classified by category and attributed to a fund.</summary>
     public Task RecordDeposit(Guid categoryId, Guid fundId, decimal amount, DateOnly date)
     {
-        Period.Deposit(CurrentMemberId, Money(amount), categoryId, fundId, date);
+        var contribution = Period.Deposit(CurrentMemberId, Money(amount), categoryId, fundId, date);
+        contribution.SetFundSynced(FundIsSynced(fundId));   // synced destination fund isn't credited here
         return SaveAsync();
     }
 
@@ -566,6 +573,7 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     {
         EnsureOwnContribution(contributionId);
         Period.EditContribution(contributionId, Money(amount), categoryId, fundId, date);
+        Period.FindContribution(contributionId)?.SetFundSynced(FundIsSynced(fundId));   // recompute at edit time
         return SaveAsync();
     }
 
@@ -718,6 +726,13 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         return SaveAsync();
     }
 
+    /// <summary>Toggle a fund's bank-synced flag (forward-only — see <see cref="Fund.IsSynced"/>).</summary>
+    public Task SetFundSynced(Guid fundId, bool synced)
+    {
+        Account.SetFundSynced(fundId, synced);
+        return SaveAsync();
+    }
+
     public string FundIcon(Guid fundId) =>
         CategoryIcons.Effective(Account.FindFund(fundId)?.Icon, Account.FindFund(fundId)?.Name);
     public string? FundStoredIcon(Guid fundId) => Account.FindFund(fundId)?.Icon;
@@ -744,7 +759,8 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
 
     public Task TransferFunds(Guid fromFundId, Guid toFundId, decimal amount, string? note)
     {
-        Period.TransferFunds(fromFundId, toFundId, Money(amount), Today(), note);
+        var transfer = Period.TransferFunds(fromFundId, toFundId, Money(amount), Today(), note);
+        transfer.SetSyncedSides(FundIsSynced(fromFundId), FundIsSynced(toFundId));   // synced sides aren't moved
         return SaveAsync();
     }
 
@@ -752,7 +768,8 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
 
     public Task EditFundTransfer(Guid id, Guid fromFundId, Guid toFundId, decimal amount, string? note)
     {
-        Period.EditFundTransfer(id, fromFundId, toFundId, Money(amount), note);
+        var transfer = Period.EditFundTransfer(id, fromFundId, toFundId, Money(amount), note);
+        transfer.SetSyncedSides(FundIsSynced(fromFundId), FundIsSynced(toFundId));
         return SaveAsync();
     }
 
@@ -801,19 +818,23 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
         if (destination.Currency != Currency)
             throw new InvalidOperationException("Both accounts must use the same currency.");
 
-        // 1) Record the outflow on this account and push it.
-        Period.TransferOut(fromFundId, Money(amount), Today(), destinationAccountId, note, PriorSaved);
+        // 1) Record the outflow on this account and push it. A synced source fund keeps its real balance, so the
+        //    outflow is informational only (marker true) — the row still shows what happened.
+        var outflow = Period.TransferOut(fromFundId, Money(amount), Today(), destinationAccountId, note, PriorSaved);
+        outflow.SetFundSynced(FundIsSynced(fromFundId));
         await SaveAsync();
 
-        // 2) Load the destination, deposit into its current period for the signed-in user, and push it.
+        // 2) Load the destination, deposit into its current period for the signed-in user, and push it. Each side
+        //    carries its own marker based on its own fund, so only the unsynced side actually moves (no double count).
         var snapshot = await api.GetSnapshotAsync(destinationAccountId);
         if (string.IsNullOrEmpty(snapshot.Payload))
             throw new InvalidOperationException($"Open “{destination.Name}” once before transferring into it.");
         var destAccount = AccountSnapshotSerializer.Deserialize(snapshot.Payload);
         var destPeriod = destAccount.CurrentPeriod
             ?? throw new InvalidOperationException($"“{destination.Name}” has no open period to receive the transfer.");
-        destPeriod.Deposit(auth.UserId, new Money(amount, destAccount.Currency),
-            fundId: ResolveDestinationFund(destAccount, destinationFundId), date: Today());
+        var destFundId = ResolveDestinationFund(destAccount, destinationFundId);
+        var destDeposit = destPeriod.Deposit(auth.UserId, new Money(amount, destAccount.Currency), fundId: destFundId, date: Today());
+        destDeposit.SetFundSynced(destAccount.Funds.FirstOrDefault(f => f.Id == destFundId)?.IsSynced ?? false);
         var payload = AccountSnapshotSerializer.Serialize(destAccount);
         await api.SaveSnapshotAsync(destinationAccountId, new SaveAccountRequest(payload, snapshot.Version));
         _cache.Remove(destinationAccountId); // its snapshot changed under us — drop so a switch refetches (feature 5)

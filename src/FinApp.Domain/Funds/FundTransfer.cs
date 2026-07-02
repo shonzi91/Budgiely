@@ -15,6 +15,11 @@ public sealed class FundTransfer : Entity
     public DateOnly Date { get; }
     public string? Note { get; }
 
+    /// <summary>Per-side markers: true when that fund was a synced (bank-mirrored) fund at creation, so its
+    /// balance is not moved by this transfer (the real bank balance handles it). See <see cref="Fund.IsSynced"/>.</summary>
+    public bool FromSynced { get; private set; }
+    public bool ToSynced { get; private set; }
+
     public FundTransfer(Guid fromFundId, Guid toFundId, Money amount, DateOnly date, string? note = null)
     {
         if (fromFundId == toFundId)
@@ -27,4 +32,6 @@ public sealed class FundTransfer : Entity
         Date = date;
         Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
     }
+
+    public void SetSyncedSides(bool fromSynced, bool toSynced) { FromSynced = fromSynced; ToSynced = toSynced; }
 }

@@ -45,6 +45,12 @@ public sealed class Expense : Entity
     /// <summary>On the <b>source</b> expense: how much was pushed onto the other account (already deducted from <see cref="Amount"/>), in the account currency.</summary>
     public decimal SettledAmount { get; }
 
+    /// <summary>True when the paying fund was synced (bank-mirrored) at creation, so this expense doesn't reduce
+    /// the fund's balance (the real bank balance handles it). See <see cref="Funds.Fund.IsSynced"/>.</summary>
+    public bool FundSynced { get; private set; }
+
+    public void SetFundSynced(bool synced) => FundSynced = synced;
+
     public Expense(
         Guid categoryId,
         Money amount,

@@ -171,6 +171,8 @@ public sealed class Localizer(IJSRuntime js)
         ["Auto-categorized merchants"] = "Автоматично категоризирани търговци",
         ["Imported transactions from these are filed here automatically. Unmapping only stops future auto-filing."] = "Импортираните транзакции от тях се завеждат тук автоматично. Премахването спира само бъдещото авт. завеждане.",
         ["Unmap"] = "Премахни",
+        ["Synced with a linked bank account"] = "Синхронизиран със свързана банкова сметка",
+        ["Expenses, transfers and deposits won’t change this fund’s balance — the bank’s real balance is authoritative. Only affects entries created from now on."] = "Разходи, преводи и вноски няма да променят баланса на този фонд — реалният банков баланс е меродавен. Важи само за записи, създадени отсега нататък.",
         ["Pick something to map to first."] = "Първо изберете към какво да свържете.",
         ["Where your money is"] = "Къде са парите ви",
         ["Move money"] = "Премести пари",

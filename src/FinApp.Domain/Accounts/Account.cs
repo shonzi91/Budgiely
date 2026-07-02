@@ -341,6 +341,10 @@ public sealed class Account : Entity
     public void SetFundIcon(Guid fundId, string? icon) =>
         (FindFund(fundId) ?? throw new InvalidOperationException("Fund not found.")).SetIcon(icon);
 
+    /// <summary>Mark/unmark a fund as synced to a bank account. Forward-only: existing entries keep their markers.</summary>
+    public void SetFundSynced(Guid fundId, bool synced) =>
+        (FindFund(fundId) ?? throw new InvalidOperationException("Fund not found.")).SetSynced(synced);
+
     /// <summary>
     /// Why a fund can't be removed, or null when it can. Opening balances are <b>not</b> a hard blocker —
     /// they can be moved to another fund on removal (see <see cref="RemoveFund"/> / <see cref="FundHasOpeningBalance"/>).

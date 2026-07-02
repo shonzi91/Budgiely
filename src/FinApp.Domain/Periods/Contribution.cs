@@ -16,6 +16,12 @@ public sealed class Contribution : Entity
     public DateOnly Date { get; private set; }
     public Money Paid { get; private set; }
 
+    /// <summary>True when the destination fund was synced (bank-mirrored) at creation, so this deposit doesn't
+    /// add to the fund's balance (the real bank balance handles it). See <see cref="Funds.Fund.IsSynced"/>.</summary>
+    public bool FundSynced { get; private set; }
+
+    public void SetFundSynced(bool synced) => FundSynced = synced;
+
     public Contribution(Guid memberId, Money paid, Guid categoryId = default, Guid fundId = default, DateOnly date = default)
     {
         if (paid.IsNegative)

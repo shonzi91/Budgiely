@@ -31,7 +31,7 @@ public static class AccountSnapshotSerializer
         var node = new AccountNode(
             account.Id, account.Name, account.Currency, account.OwnerUserId,
             account.Members.Select(m => new MemberNode(m.Id, m.UserId, m.DisplayName)).ToList(),
-            account.Funds.Select(f => new FundNode(f.Id, f.Name, f.ParentId, f.Note, f.Icon)).ToList(),
+            account.Funds.Select(f => new FundNode(f.Id, f.Name, f.ParentId, f.Note, f.Icon, f.IsSynced)).ToList(),
             account.Categories.Select(c => new CategoryNode(c.Id, c.Name, c.ParentId, c.Icon)).ToList(),
             account.SavingCategories.Select(s => new SavingCategoryNode(s.Id, s.Name, s.ParentId, s.GoalAmount, s.AlertThreshold, s.NotifyOnMilestone, s.InitialAmount, s.Icon)).ToList(),
             account.Periods.Select(ToNode).ToList(),
@@ -68,6 +68,7 @@ public static class AccountSnapshotSerializer
             var fund = Build(new Fund(f.Name, f.ParentId), f.Id);
             fund.SetNote(f.Note);
             fund.SetIcon(f.Icon);
+            fund.SetSynced(f.IsSynced);
             return fund;
         }).ToList());
         SetField(account, "_categories", node.Categories.Select(c =>
@@ -94,12 +95,12 @@ public static class AccountSnapshotSerializer
     private static PeriodNode ToNode(Period p) => new(
         p.Id, p.Currency, p.From, p.To, p.Status, p.CarriedIn.Amount,
         p.InitialBalances.Select(b => new InitialBalanceNode(b.Id, b.FundId, b.Amount.Amount, b.Informative)).ToList(),
-        p.Contributions.Select(c => new ContributionNode(c.Id, c.MemberId, c.Paid.Amount, c.CategoryId, c.FundId, c.Date)).ToList(),
+        p.Contributions.Select(c => new ContributionNode(c.Id, c.MemberId, c.Paid.Amount, c.CategoryId, c.FundId, c.Date, c.FundSynced)).ToList(),
         p.Budgets.Select(b => new BudgetNode(b.Id, b.CategoryId, b.Allocated.Amount, b.AlertThreshold, b.NotifyOnEveryExpense)).ToList(),
-        p.Expenses.Select(e => new ExpenseNode(e.Id, e.CategoryId, e.Amount.Amount, e.Date, e.MemberId, e.FundId, e.Note, e.SourceSavingCategoryId, e.OnBehalfOfOtherAccount, e.SettlementId, e.SettledToAccountId, e.SettledFromAccountId, e.SettledAmount)).ToList(),
+        p.Expenses.Select(e => new ExpenseNode(e.Id, e.CategoryId, e.Amount.Amount, e.Date, e.MemberId, e.FundId, e.Note, e.SourceSavingCategoryId, e.OnBehalfOfOtherAccount, e.SettlementId, e.SettledToAccountId, e.SettledFromAccountId, e.SettledAmount, e.FundSynced)).ToList(),
         p.SavingAllocations.Select(a => new SavingAllocationNode(a.Id, a.SavingCategoryId, a.Amount.Amount, a.Date, a.Note, a.SourceExpenseId, a.BudgetCategoryId, a.TransferPairId)).ToList(),
-        p.FundTransfers.Select(t => new FundTransferNode(t.Id, t.FromFundId, t.ToFundId, t.Amount.Amount, t.Date, t.Note)).ToList(),
-        p.ExternalTransfers.Select(t => new ExternalTransferNode(t.Id, t.FundId, t.Amount.Amount, t.Date, t.ToAccountId, t.Note)).ToList());
+        p.FundTransfers.Select(t => new FundTransferNode(t.Id, t.FromFundId, t.ToFundId, t.Amount.Amount, t.Date, t.Note, t.FromSynced, t.ToSynced)).ToList(),
+        p.ExternalTransfers.Select(t => new ExternalTransferNode(t.Id, t.FundId, t.Amount.Amount, t.Date, t.ToAccountId, t.Note, t.FundSynced)).ToList());
 
     // --- node -> domain ---------------------------------------------------
 
@@ -125,12 +126,32 @@ public static class AccountSnapshotSerializer
         if (n.Status == PeriodStatus.Closed) p.Close();
 
         SetField(p, "_initialBalances", n.InitialBalances.Select(b => Build(new InitialBalance(b.FundId, M(b.Amount), b.Informative), b.Id)).ToList());
-        SetField(p, "_contributions", n.Contributions.Where(c => c.MemberId != Period.CarryoverSource).Select(c => Build(new Contribution(c.MemberId, M(c.Paid), c.CategoryId, c.FundId, c.Date), c.Id)).ToList());
+        SetField(p, "_contributions", n.Contributions.Where(c => c.MemberId != Period.CarryoverSource).Select(c =>
+        {
+            var contribution = Build(new Contribution(c.MemberId, M(c.Paid), c.CategoryId, c.FundId, c.Date), c.Id);
+            contribution.SetFundSynced(c.FundSynced);
+            return contribution;
+        }).ToList());
         SetField(p, "_budgets", n.Budgets.Select(b => Build(new Budget(b.CategoryId, M(b.Allocated), b.AlertThreshold, b.NotifyOnEveryExpense), b.Id)).ToList());
-        SetField(p, "_expenses", n.Expenses.Select(e => Build(new Expense(e.CategoryId, M(e.Amount), e.Date, e.MemberId, e.FundId, e.Note, e.SourceSavingCategoryId, e.OnBehalfOfOtherAccount, e.SettlementId, e.SettledToAccountId, e.SettledFromAccountId, e.SettledAmount), e.Id)).ToList());
+        SetField(p, "_expenses", n.Expenses.Select(e =>
+        {
+            var expense = Build(new Expense(e.CategoryId, M(e.Amount), e.Date, e.MemberId, e.FundId, e.Note, e.SourceSavingCategoryId, e.OnBehalfOfOtherAccount, e.SettlementId, e.SettledToAccountId, e.SettledFromAccountId, e.SettledAmount), e.Id);
+            expense.SetFundSynced(e.FundSynced);
+            return expense;
+        }).ToList());
         SetField(p, "_savingAllocations", n.SavingAllocations.Select(a => Build(new SavingAllocation(a.SavingCategoryId, M(a.Amount), a.Date, a.Note, a.SourceExpenseId, a.BudgetCategoryId, a.TransferPairId), a.Id)).ToList());
-        SetField(p, "_fundTransfers", n.FundTransfers.Select(t => Build(new FundTransfer(t.FromFundId, t.ToFundId, M(t.Amount), t.Date, t.Note), t.Id)).ToList());
-        SetField(p, "_externalTransfers", (n.ExternalTransfers ?? []).Select(t => Build(new ExternalTransfer(t.FundId, M(t.Amount), t.Date, t.ToAccountId, t.Note), t.Id)).ToList());
+        SetField(p, "_fundTransfers", n.FundTransfers.Select(t =>
+        {
+            var transfer = Build(new FundTransfer(t.FromFundId, t.ToFundId, M(t.Amount), t.Date, t.Note), t.Id);
+            transfer.SetSyncedSides(t.FromSynced, t.ToSynced);
+            return transfer;
+        }).ToList());
+        SetField(p, "_externalTransfers", (n.ExternalTransfers ?? []).Select(t =>
+        {
+            var transfer = Build(new ExternalTransfer(t.FundId, M(t.Amount), t.Date, t.ToAccountId, t.Note), t.Id);
+            transfer.SetFundSynced(t.FundSynced);
+            return transfer;
+        }).ToList());
         return p;
     }
 
@@ -170,7 +191,7 @@ public static class AccountSnapshotSerializer
 
     private record MemberNode(Guid Id, Guid UserId, string DisplayName);
     private record ContributionCategoryNode(Guid Id, string Name, string? Icon = null);
-    private record FundNode(Guid Id, string Name, Guid? ParentId, string? Note = null, string? Icon = null);
+    private record FundNode(Guid Id, string Name, Guid? ParentId, string? Note = null, string? Icon = null, bool IsSynced = false);
     private record CategoryNode(Guid Id, string Name, Guid? ParentId, string? Icon = null);
     private record SavingCategoryNode(Guid Id, string Name, Guid? ParentId, decimal? GoalAmount, decimal AlertThreshold, bool NotifyOnMilestone, decimal InitialAmount, string? Icon = null);
 
@@ -181,11 +202,11 @@ public static class AccountSnapshotSerializer
 
     private record InitialBalanceNode(Guid Id, Guid FundId, decimal Amount, bool Informative);
     private record ContributionNode(Guid Id, Guid MemberId, decimal Paid,
-        Guid CategoryId = default, Guid FundId = default, DateOnly Date = default);
+        Guid CategoryId = default, Guid FundId = default, DateOnly Date = default, bool FundSynced = false);
     private record BudgetNode(Guid Id, Guid CategoryId, decimal Allocated, decimal AlertThreshold, bool NotifyOnEveryExpense);
     private record ExpenseNode(Guid Id, Guid CategoryId, decimal Amount, DateOnly Date, Guid MemberId, Guid FundId, string? Note, Guid? SourceSavingCategoryId, bool OnBehalfOfOtherAccount = false,
-        Guid? SettlementId = null, Guid? SettledToAccountId = null, Guid? SettledFromAccountId = null, decimal SettledAmount = 0m);
+        Guid? SettlementId = null, Guid? SettledToAccountId = null, Guid? SettledFromAccountId = null, decimal SettledAmount = 0m, bool FundSynced = false);
     private record SavingAllocationNode(Guid Id, Guid SavingCategoryId, decimal Amount, DateOnly Date, string? Note, Guid? SourceExpenseId, Guid? BudgetCategoryId = null, Guid? TransferPairId = null);
-    private record FundTransferNode(Guid Id, Guid FromFundId, Guid ToFundId, decimal Amount, DateOnly Date, string? Note);
-    private record ExternalTransferNode(Guid Id, Guid FundId, decimal Amount, DateOnly Date, Guid? ToAccountId, string? Note);
+    private record FundTransferNode(Guid Id, Guid FromFundId, Guid ToFundId, decimal Amount, DateOnly Date, string? Note, bool FromSynced = false, bool ToSynced = false);
+    private record ExternalTransferNode(Guid Id, Guid FundId, decimal Amount, DateOnly Date, Guid? ToAccountId, string? Note, bool FundSynced = false);
 }
