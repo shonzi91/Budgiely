@@ -92,6 +92,41 @@ public class SyncedFundTests
         Assert.Equal(M(100), p.FundBalance(cash));    // synced destination unchanged
     }
 
+    // Money-in modeled as a movement into the synced fund: destination synced (not credited), source moves.
+    [Fact]
+    public void Money_in_from_a_fund_moves_only_the_source()
+    {
+        var a = Acc(out var p);
+        var bank = a.FundId("Bank");   // the synced Revolut fund
+        var cash = a.FundId("Cash");   // the source the money came from
+        p.SetInitialBalance(bank, M(1000));
+        p.SetInitialBalance(cash, M(500));
+        FundOf(a, "Bank").SetSynced(true);
+
+        // €200 arrived in the synced fund from Cash.
+        var t = p.TransferFunds(cash, bank, M(200), new DateOnly(2026, 1, 8));
+        t.SetSyncedSides(fromSynced: false, toSynced: true);
+
+        Assert.Equal(M(300), p.FundBalance(cash));    // source decreased
+        Assert.Equal(M(1000), p.FundBalance(bank));   // synced destination unchanged (real balance handles it)
+    }
+
+    [Fact]
+    public void Money_in_from_a_contributor_counts_as_income_without_crediting_the_fund()
+    {
+        var a = Acc(out var p);
+        var owner = Guid.NewGuid();
+        var bank = a.FundId("Bank");
+        p.SetInitialBalance(bank, M(1000));
+        FundOf(a, "Bank").SetSynced(true);
+
+        var c = p.Deposit(owner, M(600), fundId: bank, date: new DateOnly(2026, 1, 2));
+        c.SetFundSynced(true);
+
+        Assert.Equal(M(600), p.ContributionsPaidTotal);   // still recorded as income/contributed
+        Assert.Equal(M(1000), p.FundBalance(bank));        // but the synced fund isn't credited
+    }
+
     [Fact]
     public void Deposit_into_synced_fund_does_not_increase_it()
     {

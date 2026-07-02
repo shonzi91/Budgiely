@@ -358,6 +358,12 @@ accounts.MapPost("/{id:guid}/bank/reset", async (Guid id, DateOnly from, DateOnl
     return Results.NoContent();
 });
 
+accounts.MapPut("/{id:guid}/bank/fund", async (Guid id, SetBankFundRequest req, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
+{
+    await svc.SetConnectionFundAsync(user.UserId(), id, req.FundId, ct);
+    return Results.NoContent();
+});
+
 accounts.MapGet("/{id:guid}/bank/mappings", async (Guid id, ClaimsPrincipal user, BankSyncService svc, CancellationToken ct) =>
     Results.Ok(await svc.GetMappingsAsync(user.UserId(), id, ct)));
 

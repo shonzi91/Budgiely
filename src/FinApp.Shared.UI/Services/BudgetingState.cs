@@ -527,6 +527,12 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     /// <summary>Whether a fund is currently synced to a bank account (its balance is externally authoritative).</summary>
     public bool FundIsSynced(Guid fundId) => _account?.Funds.FirstOrDefault(f => f.Id == fundId)?.IsSynced ?? false;
 
+    /// <summary>The account's synced fund (the one mirroring the linked bank account), or empty if none is marked.
+    /// Bank-imported records route here automatically. First synced fund wins if several are marked.</summary>
+    public Guid SyncedFundId => _account?.Funds.FirstOrDefault(f => f.IsSynced)?.Id ?? Guid.Empty;
+    public bool HasSyncedFund => SyncedFundId != Guid.Empty;
+    public string SyncedFundName => HasSyncedFund ? FundName(SyncedFundId) : "";
+
     public Task AddExpense(Guid categoryId, decimal amount, Guid fundId, string? note, DateOnly date, bool onBehalfOfOtherAccount = false)
     {
         var expense = new Expense(categoryId, Money(amount), date, CurrentMemberId, fundId, note,
@@ -731,6 +737,25 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
     {
         Account.SetFundSynced(fundId, synced);
         return SaveAsync();
+    }
+
+    /// <summary>Bind a fund to the account's bank connection (the synced fund). Exactly one fund can be bound, so
+    /// any other synced fund is cleared. Sets the fund flag (snapshot) and records the binding on the connection.</summary>
+    public async Task BindFundToBank(Guid fundId)
+    {
+        foreach (var f in Account.Funds.Where(f => f.IsSynced && f.Id != fundId).ToList())
+            Account.SetFundSynced(f.Id, false);
+        Account.SetFundSynced(fundId, true);
+        await SaveAsync();
+        await api.SetBankFundAsync(CurrentAccountId, fundId);
+    }
+
+    /// <summary>Unbind a fund from the bank connection (stops routing imports; existing entries keep their markers).</summary>
+    public async Task UnbindFundFromBank(Guid fundId)
+    {
+        Account.SetFundSynced(fundId, false);
+        await SaveAsync();
+        await api.SetBankFundAsync(CurrentAccountId, null);
     }
 
     public string FundIcon(Guid fundId) =>
@@ -993,6 +1018,33 @@ public sealed class BudgetingState(FinAppApiClient api, AuthState auth, SyncClie
 
     public Task DismissBankTransaction(string externalId) =>
         api.AckBankTransactionAsync(CurrentAccountId, externalId, confirmed: false);
+
+    /// <summary>Turn a bank money-in into a movement into the synced fund: the destination is the synced fund
+    /// (not credited — the real balance handles it); the <paramref name="source"/> ("fund:{id}" or
+    /// "contributor:{id}") is where it came from and is the side that actually moves. Then acks the row.</summary>
+    public async Task ConfirmBankMoneyIn(string externalId, string source, decimal amount, string? note, DateOnly date)
+    {
+        if (!HasSyncedFund) throw new InvalidOperationException("Mark a fund as synced to your bank first (Edit fund).");
+        var parts = (source ?? "").Split(':');
+        if (parts.Length != 2 || !Guid.TryParse(parts[1], out var targetId))
+            throw new InvalidOperationException("Pick where this money came from.");
+
+        if (parts[0] == "fund")
+        {
+            if (targetId == SyncedFundId) throw new InvalidOperationException("The source can't be the synced fund itself.");
+            var transfer = Period.TransferFunds(targetId, SyncedFundId, Money(amount), date, note);
+            transfer.SetSyncedSides(FundIsSynced(targetId), toSynced: true);   // synced destination isn't credited
+        }
+        else if (parts[0] == "contributor")
+        {
+            var deposit = Period.Deposit(targetId, Money(amount), fundId: SyncedFundId, date: date);
+            deposit.SetFundSynced(true);   // counts as a contribution, but the synced fund isn't credited
+        }
+        else throw new InvalidOperationException("Unknown money-in source.");
+
+        await SaveAsync();
+        await api.AckBankTransactionAsync(CurrentAccountId, externalId, confirmed: true);
+    }
 
     /// <summary>Drop the current account's bank connection so it can be linked again.</summary>
     public Task DisconnectBank() => api.DisconnectBankAsync(CurrentAccountId);

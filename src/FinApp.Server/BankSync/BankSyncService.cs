@@ -50,6 +50,10 @@ public sealed class BankSyncService(FinAppDbContext db, EnableBankingClient eb, 
             "CREATE TABLE IF NOT EXISTS \"BankMappings\" (" +
             "\"AccountId\" text NOT NULL, \"MatchKey\" text NOT NULL, \"Kind\" text NOT NULL, \"TargetId\" text NOT NULL, " +
             "PRIMARY KEY (\"AccountId\", \"MatchKey\"))", ct);
+        // Which fund this connection is bound to (the "synced" fund). Added idempotently so the existing table
+        // gains the column without a migration. SQLite lacks ADD COLUMN IF NOT EXISTS, so ignore the "duplicate" error.
+        try { await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"BankConnections\" ADD COLUMN \"FundId\" text NULL", ct); }
+        catch { /* column already exists */ }
     }
 
     /// <summary>Normalized merchant key used to match a transaction description to a saved rule.</summary>
@@ -85,7 +89,8 @@ public sealed class BankSyncService(FinAppDbContext db, EnableBankingClient eb, 
             Connected: row is { Status: "Linked" },
             InstitutionName: row?.InstitutionName,
             ConsentExpiresAt: row?.ConsentExpiresAt,
-            LastSyncedAt: row?.LastSyncedAt);
+            LastSyncedAt: row?.LastSyncedAt,
+            FundId: row?.FundId);
     }
 
     public async Task<StartBankLinkResponse> StartLinkAsync(Guid userId, Guid accountId, StartBankLinkRequest req, string callbackUrl, CancellationToken ct = default)
@@ -298,7 +303,7 @@ public sealed class BankSyncService(FinAppDbContext db, EnableBankingClient eb, 
     }
 
     private sealed record ConnectionRow(string ProviderRef, string Institution, string InstitutionName,
-        string? AccountRef, string Status, DateTimeOffset? ConsentExpiresAt, DateTimeOffset? LastSyncedAt);
+        string? AccountRef, string Status, DateTimeOffset? ConsentExpiresAt, DateTimeOffset? LastSyncedAt, Guid? FundId);
 
     private async Task<ConnectionRow?> ReadConnectionAsync(Guid accountId, CancellationToken ct)
     {
@@ -307,7 +312,7 @@ public sealed class BankSyncService(FinAppDbContext db, EnableBankingClient eb, 
         try
         {
             await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT \"ProviderRef\", \"Institution\", \"InstitutionName\", \"AccountRef\", \"Status\", \"ConsentExpiresAt\", \"LastSyncedAt\" " +
+            cmd.CommandText = "SELECT \"ProviderRef\", \"Institution\", \"InstitutionName\", \"AccountRef\", \"Status\", \"ConsentExpiresAt\", \"LastSyncedAt\", \"FundId\" " +
                               "FROM \"BankConnections\" WHERE \"AccountId\" = @acc";
             AddParam(cmd, "@acc", accountId.ToString());
             await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -317,7 +322,26 @@ public sealed class BankSyncService(FinAppDbContext db, EnableBankingClient eb, 
                 reader.IsDBNull(3) ? null : reader.GetString(3),
                 reader.GetString(4),
                 reader.IsDBNull(5) ? null : DateTimeOffset.Parse(reader.GetString(5), CultureInfo.InvariantCulture),
-                reader.IsDBNull(6) ? null : DateTimeOffset.Parse(reader.GetString(6), CultureInfo.InvariantCulture));
+                reader.IsDBNull(6) ? null : DateTimeOffset.Parse(reader.GetString(6), CultureInfo.InvariantCulture),
+                reader.IsDBNull(7) || !Guid.TryParse(reader.GetString(7), out var fid) ? null : fid);
+        }
+        finally { if (opened) await conn.CloseAsync(); }
+    }
+
+    /// <summary>Bind (or unbind, with null) the fund this connection mirrors. Kept separate from link/sync so
+    /// those never overwrite the binding.</summary>
+    public async Task SetConnectionFundAsync(Guid userId, Guid accountId, Guid? fundId, CancellationToken ct = default)
+    {
+        await EnsureContributorAsync(userId, accountId, ct);
+        var conn = db.Database.GetDbConnection();
+        var opened = await OpenAsync(conn, ct);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE \"BankConnections\" SET \"FundId\" = @fund WHERE \"AccountId\" = @acc";
+            AddParam(cmd, "@fund", (object?)fundId?.ToString() ?? DBNull.Value);
+            AddParam(cmd, "@acc", accountId.ToString());
+            await cmd.ExecuteNonQueryAsync(ct);
         }
         finally { if (opened) await conn.CloseAsync(); }
     }

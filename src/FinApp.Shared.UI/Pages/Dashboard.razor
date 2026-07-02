@@ -481,6 +481,67 @@ else
                 </section>
             }
 
+            @if (_bankStatus?.Enabled == true && _bankStatus.Connected && BankCredits().Count > 0)
+            {
+                <section class="panel">
+                    <div class="panel-head"><h2>💰 @Loc["Incoming from bank"]</h2></div>
+                    @if (!State.HasSyncedFund)
+                    {
+                        <div class="alert warn-bg"><span>@Loc["Mark a fund as synced to this bank (Edit a fund) to receive these."]</span></div>
+                    }
+                    else
+                    {
+                        <p class="hint">@string.Format(Loc["Money that arrived in {0}. Choose where each came from — the destination is your synced fund."], State.SyncedFundName)</p>
+                    }
+                    <ul class="list bank-pending">
+                        @foreach (var t in BankCredits())
+                        {
+                            var tx = t;
+                            var id = tx.ExternalId;
+                            var mappedLabel = MappedLabel(tx.Description);
+                            var pinTitle = mappedLabel is not null ? string.Format(Loc["Auto-fills {0} — click to forget"], mappedLabel) : Loc["Always use this source for this merchant"];
+                            <li class="bank-tx">
+                                <div class="bank-tx-top">
+                                    <span class="bank-tx-desc" title="@tx.Description">@tx.Description</span>
+                                    <span class="amt credit">+@Fmt(new Money(tx.Amount, State.Currency))</span>
+                                </div>
+                                <div class="bank-tx-row">
+                                    <span class="bank-tx-date">@tx.Date.ToString("dd MMM")</span>
+                                    <select class="bank-sel" value="@RowCredit(id)" @onchange="e => _bankRowCredit[id] = e.Value?.ToString() ?? string.Empty">
+                                        <option value="">@Loc["From… (source)"]</option>
+                                        <optgroup label="@Loc["Funds"]">
+                                            @foreach (var f in State.RootFunds.Where(f => f.Id != State.SyncedFundId))
+                                            {
+                                                <option value="fund:@f.Id">@f.Name</option>
+                                            }
+                                        </optgroup>
+                                        <optgroup label="@Loc["People"]">
+                                            @foreach (var m in State.RealUsers)
+                                            {
+                                                <option value="contributor:@m.UserId">@m.DisplayName</option>
+                                            }
+                                        </optgroup>
+                                    </select>
+                                    @if (State.HasSyncedFund)
+                                    {
+                                        <span class="bank-tx-fund" title="@Loc["Into your synced fund"]">↦ @State.SyncedFundName</span>
+                                    }
+                                    <span class="bank-tx-icons">
+                                        <button class="icon-btn pin @(mappedLabel is not null ? "on" : "")" title="@pinTitle" @onclick="() => TogglePin(tx)" disabled="@_bankBusy">📌</button>
+                                        <button class="icon-btn ok" title="@Loc["Add movement"]" @onclick="() => ConfirmMoneyInRow(tx)" disabled="@(_bankBusy || !State.HasSyncedFund)">✓</button>
+                                        <button class="icon-btn x" title="@Loc["Dismiss"]" @onclick="() => DismissBankRow(tx)" disabled="@_bankBusy">✕</button>
+                                    </span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                    @if (_bankError is not null)
+                    {
+                        <div class="alert warn-bg"><span>@_bankError</span><button class="alert-x" title="@Loc["Dismiss"]" @onclick="() => _bankError = null">×</button></div>
+                    }
+                </section>
+            }
+
             <section class="panel">
                 <div class="panel-head">
                     <h2>@Loc["Income"]</h2>
@@ -841,12 +902,19 @@ else
                                                 <option value="@cat.Id">@CatOption(cat.Id, cat.Name, depth)</option>
                                             }
                                         </select>
-                                        <select class="bank-sel" value="@RowFund(id)" @onchange="e => _bankRowFund[id] = Guid.Parse(e.Value?.ToString() ?? Guid.Empty.ToString())">
-                                            @foreach (var f in State.RootFunds)
-                                            {
-                                                <option value="@f.Id">@f.Name</option>
-                                            }
-                                        </select>
+                                        @if (State.HasSyncedFund)
+                                        {
+                                            <span class="bank-tx-fund" title="@Loc["Posts to your synced fund"]">↦ @State.SyncedFundName</span>
+                                        }
+                                        else
+                                        {
+                                            <select class="bank-sel" value="@RowFund(id)" @onchange="e => _bankRowFund[id] = Guid.Parse(e.Value?.ToString() ?? Guid.Empty.ToString())">
+                                                @foreach (var f in State.RootFunds)
+                                                {
+                                                    <option value="@f.Id">@f.Name</option>
+                                                }
+                                            </select>
+                                        }
                                     }
                                     else
                                     {
@@ -889,6 +957,10 @@ else
                             var debits = bankRows.Where(r => r.Amount < 0).ToList();
                             var credits = bankRows.Where(r => r.Amount > 0).ToList();
 
+                            @if (!State.HasSyncedFund)
+                            {
+                                <div class="alert warn-bg"><span>@Loc["Mark a fund as synced to this bank (Setup → a fund → Edit) so imports file automatically."]</span></div>
+                            }
                             @if (debits.Count > 0)
                             {
                                 <h3 class="bank-group-h">🧾 @Loc["Expenses"] <span class="bank-group-count">@debits.Count</span></h3>
@@ -896,12 +968,13 @@ else
                                     @foreach (var t in debits) { @BankTxRow(t) }
                                 </ul>
                             }
+                            else
+                            {
+                                <p class="hint">@Loc["No expenses waiting for this period."]</p>
+                            }
                             @if (credits.Count > 0)
                             {
-                                <h3 class="bank-group-h">💰 @Loc["Money in"] <span class="bank-group-count">@credits.Count</span></h3>
-                                <ul class="list bank-pending">
-                                    @foreach (var t in credits) { @BankTxRow(t) }
-                                </ul>
+                                <p class="hint">💰 @string.Format(Loc["{0} money-in waiting — handle them under Money → Move money."], credits.Count)</p>
                             }
                         }
                     }
@@ -1584,13 +1657,17 @@ else
                     @iconPicker
                     <label>@Loc["Note (optional)"] <input type="text" @bind="_fundNote" /></label>
                     <label>@Loc["Opening balance this period"] <input type="text" inputmode="text" @bind:get="_openingAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)" @bind:set="v => _openingAmount = EvalSum(v)" /></label>
-                    @if (_bankStatus?.Enabled == true)
+                    @if (_bankStatus?.Connected == true)
                     {
-                        <label class="check"><input type="checkbox" @bind="_fSynced" /> @Loc["Synced with a linked bank account"]</label>
+                        <label class="check"><input type="checkbox" @bind="_fSynced" /> @string.Format(Loc["Sync this fund with {0} (linked account)"], _bankStatus.InstitutionName)</label>
                         @if (_fSynced)
                         {
-                            <small class="hint">@Loc["Expenses, transfers and deposits won’t change this fund’s balance — the bank’s real balance is authoritative. Only affects entries created from now on."]</small>
+                            <small class="hint">@Loc["Bank imports post here, and its balance mirrors the real account — expenses, transfers and deposits won’t change it (only affects entries created from now on)."]</small>
                         }
+                    }
+                    else if (_bankStatus?.Enabled == true)
+                    {
+                        <small class="hint">@Loc["Link a bank in the Bank tab to sync a fund with it."]</small>
                     }
                     <div class="modal-actions">
                         <button class="ghost" @onclick="Back">@Loc["Cancel"]</button>
@@ -1949,6 +2026,11 @@ else
     private List<PendingBankTransactionDto> BankRowsForPeriod() =>
         _bankPending.Where(t => t.Amount != 0 && t.Date >= State.Period.From && t.Date <= State.Period.To).ToList();
 
+    /// <summary>Pending bank expenses (debits) — reviewed in the Bank tab.</summary>
+    private List<PendingBankTransactionDto> BankDebits() => BankRowsForPeriod().Where(t => t.Amount < 0).ToList();
+    /// <summary>Pending bank money-ins (credits) — reviewed under Money → Move money.</summary>
+    private List<PendingBankTransactionDto> BankCredits() => BankRowsForPeriod().Where(t => t.Amount > 0).ToList();
+
     /// <summary>After returning from the bank's consent page (/?bank=linked|error), land on the Bank tab and pull transactions.</summary>
     private async Task HandleBankReturnAsync()
     {
@@ -2035,12 +2117,29 @@ else
     private async Task ConfirmBankRow(PendingBankTransactionDto tx)
     {
         var cat = RowCat(tx.ExternalId);
-        var fund = RowFund(tx.ExternalId);
-        if (cat == Guid.Empty || fund == Guid.Empty) { _bankError = Loc["Pick a category and fund first."]; return; }
+        // Bank expenses come from the linked account, so they always post to the synced fund (which isn't
+        // debited — the real bank balance handles it). Fall back to the row's fund only if no fund is synced yet.
+        var fund = State.HasSyncedFund ? State.SyncedFundId : RowFund(tx.ExternalId);
+        if (cat == Guid.Empty || fund == Guid.Empty) { _bankError = Loc["Pick a category first."]; return; }
         _bankBusy = true; _bankError = null;
         try
         {
             await State.ConfirmBankTransaction(tx.ExternalId, cat, Math.Abs(tx.Amount), fund, tx.Description, ClampToPeriod(tx.Date));
+            _bankPending.RemoveAll(p => p.ExternalId == tx.ExternalId);
+        }
+        catch (Exception ex) { _bankError = ex.Message; }
+        finally { _bankBusy = false; }
+    }
+
+    /// <summary>Turn a bank money-in into a movement into the synced fund (source picked/mapped).</summary>
+    private async Task ConfirmMoneyInRow(PendingBankTransactionDto tx)
+    {
+        var source = RowCredit(tx.ExternalId);
+        if (string.IsNullOrEmpty(source)) { _bankError = Loc["Pick where this money came from first."]; return; }
+        _bankBusy = true; _bankError = null;
+        try
+        {
+            await State.ConfirmBankMoneyIn(tx.ExternalId, source, tx.Amount, tx.Description, ClampToPeriod(tx.Date));
             _bankPending.RemoveAll(p => p.ExternalId == tx.ExternalId);
         }
         catch (Exception ex) { _bankError = ex.Message; }
@@ -2633,8 +2732,13 @@ else
             await State.SetFundNote(_modalFundId, _fundNote);
             await State.SetFundIcon(_modalFundId, _fIcon);
             await State.SetFundOpeningBalance(_modalFundId, _openingAmount);
-            if (_fSynced != State.FundIsSynced(_modalFundId))
-                await State.SetFundSynced(_modalFundId, _fSynced);
+            // Bind/unbind this fund to the live bank connection (writes the binding server-side too).
+            if (_bankStatus?.Connected == true && _fSynced != State.FundIsSynced(_modalFundId))
+            {
+                if (_fSynced) await State.BindFundToBank(_modalFundId);
+                else await State.UnbindFundFromBank(_modalFundId);
+                await LoadBankAsync();
+            }
         }
         var after = _afterCreate; _afterCreate = null;
         Back();

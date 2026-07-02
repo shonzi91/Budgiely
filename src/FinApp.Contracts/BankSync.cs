@@ -1,7 +1,8 @@
 namespace FinApp.Contracts;
 
-/// <summary>Whether bank sync is configured server-side, and this account's current connection (if any).</summary>
-public record BankSyncStatusDto(bool Enabled, bool Connected, string? InstitutionName, DateTimeOffset? ConsentExpiresAt, DateTimeOffset? LastSyncedAt);
+/// <summary>Whether bank sync is configured server-side, and this account's current connection (if any).
+/// <see cref="FundId"/> is the fund this connection is bound to (the "synced" fund), or null if unbound.</summary>
+public record BankSyncStatusDto(bool Enabled, bool Connected, string? InstitutionName, DateTimeOffset? ConsentExpiresAt, DateTimeOffset? LastSyncedAt, Guid? FundId = null);
 
 /// <summary>A bank the aggregator knows about (Enable Banking identifies an ASPSP by name + country).</summary>
 public record BankInstitutionDto(string Name, string Country);
@@ -24,3 +25,6 @@ public record BankMappingDto(string MatchKey, string Kind, Guid TargetId);
 
 /// <summary>Save a merchant rule from a transaction's <see cref="Description"/>.</summary>
 public record SetBankMappingRequest(string Description, string Kind, Guid TargetId);
+
+/// <summary>Bind the connection to a fund (the synced fund), or unbind with a null <see cref="FundId"/>.</summary>
+public record SetBankFundRequest(Guid? FundId);

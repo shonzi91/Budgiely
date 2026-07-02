@@ -101,6 +101,8 @@ public sealed class FinAppApiClient(HttpClient http)
         SendAsync(HttpMethod.Delete, $"/accounts/{accountId}/bank/connection", null, ct);
     public Task ResetBankRangeAsync(Guid accountId, DateOnly from, DateOnly to, CancellationToken ct = default) =>
         SendAsync(HttpMethod.Post, $"/accounts/{accountId}/bank/reset?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", null, ct);
+    public Task SetBankFundAsync(Guid accountId, Guid? fundId, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Put, $"/accounts/{accountId}/bank/fund", new SetBankFundRequest(fundId), ct);
     public Task<List<BankMappingDto>> GetBankMappingsAsync(Guid accountId, CancellationToken ct = default) =>
         SendAsync<List<BankMappingDto>>(HttpMethod.Get, $"/accounts/{accountId}/bank/mappings", null, ct);
     public Task SetBankMappingAsync(Guid accountId, string description, string kind, Guid targetId, CancellationToken ct = default) =>
